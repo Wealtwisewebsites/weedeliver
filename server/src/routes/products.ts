@@ -72,9 +72,10 @@ router.post("/:id/image", authenticate, requireRole("DISPENSARY"), upload.single
 
     // In production: upload to Cloudinary
     const dataUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+    const existing = JSON.parse(product.imageUrls || "[]") as string[];
     const updated = await prisma.product.update({
       where: { id: req.params.id },
-      data: { imageUrls: { push: dataUrl } },
+      data: { imageUrls: JSON.stringify([...existing, dataUrl]) },
     });
     res.json({ imageUrls: updated.imageUrls });
   } catch (err: any) { res.status(400).json({ error: err.message }); }
