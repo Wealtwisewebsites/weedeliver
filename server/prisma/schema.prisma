@@ -1,0 +1,290 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// ─── USERS ───
+model User {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  phone           String?
+  passwordHash    String?
+  role            String    @default("CUSTOMER")
+  firstName       String
+  lastName        String
+  dateOfBirth     DateTime?
+  isVerified      Boolean   @default(false)
+  isAgeVerified   Boolean   @default(false)
+  oauthProvider   String?
+  oauthId         String?
+  profileImageUrl String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  dispensary      Dispensary?
+  driver          Driver?
+  memberships     Membership[]
+  orders          Order[]        @relation("CustomerOrders")
+  driverOrders    Order[]        @relation("DriverOrders")
+  payments        Payment[]
+  tickets         SupportTicket[]
+  adminPayouts    Payout[]       @relation("AdminPayouts")
+
+  @@index([email])
+  @@index([role])
+}
+
+// ─── DISPENSARIES ───
+model Dispensary {
+  id              String     @id @default(uuid())
+  userId          String     @unique
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  slug            String     @unique
+  bio             String?
+  tagline         String?
+  logoUrl         String?
+  bannerUrl       String?
+  address         String
+  city            String
+  province        String
+  lat             Decimal?
+  lng             Decimal?
+  deliveryRadius  Int        @default(10)
+  deliveryFee     Decimal    @default(0)
+  minimumOrder    Decimal    @default(0)
+  operatingHours  String?
+  isApproved      Boolean    @default(false)
+  isActive        Boolean    @default(true)
+  membershipPrice Decimal    @default(0)
+  membershipType  String     @default("FREE")
+  socialLinks     String?
+  rating          Decimal    @default(0)
+  reviewCount     Int        @default(0)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  products        Product[]
+  memberships     Membership[]
+  orders          Order[]
+  banking         DispensaryBanking?
+  payouts         Payout[]
+
+  @@index([slug])
+  @@index([city])
+  @@index([isApproved, isActive])
+}
+
+// ─── PRODUCTS ───
+model Product {
+  id             String    @id @default(uuid())
+  dispensaryId   String
+  dispensary     Dispensary @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
+  name           String
+  slug           String
+  description    String?
+  category       String    @default("OTHER")
+  imageUrls      String    @default("[]")
+  price          Decimal
+  unit           String    @default("per gram")
+  thcPercent     Decimal?
+  cbdPercent     Decimal?
+  strainType     String?
+  effectSpectrum Int?
+  stock          Int       @default(0)
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  orderItems     OrderItem[]
+
+  @@unique([dispensaryId, slug])
+  @@index([dispensaryId])
+  @@index([category])
+}
+
+// ─── MEMBERSHIPS ───
+model Membership {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dispensaryId  String
+  dispensary    Dispensary @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
+  status        String    @default("PENDING")
+  proofImageUrl String?
+  paymentId     String?
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  orders        Order[]
+
+  @@unique([userId, dispensaryId])
+  @@index([userId])
+  @@index([dispensaryId])
+}
+
+// ─── ORDERS ───
+model Order {
+  id                  String      @id @default(uuid())
+  customerId          String
+  customer            User        @relation("CustomerOrders", fields: [customerId], references: [id])
+  dispensaryId        String
+  dispensary          Dispensary  @relation(fields: [dispensaryId], references: [id])
+  driverId            String?
+  driver              User?       @relation("DriverOrders", fields: [driverId], references: [id])
+  membershipId        String?
+  membership          Membership? @relation(fields: [membershipId], references: [id])
+  status              String      @default("PENDING")
+  deliveryAddress     String
+  deliveryLat         Decimal?
+  deliveryLng         Decimal?
+  subtotal            Decimal
+  deliveryFee         Decimal
+  total               Decimal
+  specialInstructions String?
+  estimatedDelivery   DateTime?
+  confirmedAt         DateTime?
+  preparingAt         DateTime?
+  readyAt             DateTime?
+  driverAssignedAt    DateTime?
+  inTransitAt         DateTime?
+  deliveredAt         DateTime?
+  cancelledAt         DateTime?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  items               OrderItem[]
+  payments            Payment[]
+  tracking            DeliveryTracking?
+  tickets             SupportTicket[]
+
+  @@index([customerId])
+  @@index([dispensaryId])
+  @@index([driverId])
+  @@index([status])
+}
+
+// ─── ORDER ITEMS ───
+model OrderItem {
+  id          String  @id @default(uuid())
+  orderId     String
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product @relation(fields: [productId], references: [id])
+  quantity    Int
+  unitPrice   Decimal
+  productName String
+
+  @@index([orderId])
+}
+
+// ─── PAYMENTS ───
+model Payment {
+  id           String    @id @default(uuid())
+  orderId      String?
+  order        Order?    @relation(fields: [orderId], references: [id])
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  provider     String
+  amount       Decimal
+  currency     String    @default("ZAR")
+  status       String    @default("PENDING")
+  providerRef  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([orderId])
+  @@index([userId])
+}
+
+// ─── DELIVERY TRACKING ───
+model DeliveryTracking {
+  id         String   @id @default(uuid())
+  orderId    String   @unique
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  driverId   String
+  currentLat Decimal?
+  currentLng Decimal?
+  pickupLat  Decimal?
+  pickupLng  Decimal?
+  dropoffLat Decimal?
+  dropoffLng Decimal?
+  status     String   @default("PENDING")
+  updatedAt  DateTime @updatedAt
+}
+
+// ─── DRIVERS ───
+model Driver {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicleType     String?
+  licenseNumber   String?
+  isOnline        Boolean  @default(false)
+  currentLat      Decimal?
+  currentLng      Decimal?
+  totalDeliveries Int      @default(0)
+  totalEarnings   Decimal  @default(0)
+  rating          Decimal  @default(5.0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ─── SUPPORT TICKETS ───
+model SupportTicket {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  orderId    String?
+  order      Order?   @relation(fields: [orderId], references: [id])
+  subject    String
+  body       String
+  status     String   @default("OPEN")
+  adminNotes String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+// ─── DISPENSARY BANKING ───
+model DispensaryBanking {
+  id                String     @id @default(uuid())
+  dispensaryId      String     @unique
+  dispensary        Dispensary @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
+  bankName          String
+  accountHolderName String
+  accountNumber     String
+  branchCode        String
+  accountType       String     @default("CHEQUE")
+  isVerified        Boolean    @default(false)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+}
+
+// ─── PAYOUTS ───
+model Payout {
+  id            String     @id @default(uuid())
+  dispensaryId  String
+  dispensary    Dispensary @relation(fields: [dispensaryId], references: [id])
+  amount        Decimal
+  grossRevenue  Decimal
+  commission    Decimal
+  period        String
+  status        String     @default("PENDING")
+  paidAt        DateTime?
+  reference     String?
+  adminId       String?
+  admin         User?      @relation("AdminPayouts", fields: [adminId], references: [id])
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([dispensaryId])
+  @@index([status])
+}
