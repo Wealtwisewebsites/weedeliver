@@ -32,3 +32,5 @@ graphify-out/
 
 # MCP tooling
 .mcp.json
+
+.vercel
