@@ -30,7 +30,11 @@ const allowedOrigins = [
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin || allowedOrigins.some(o => origin.startsWith(o))) cb(null, true);
-    else cb(null, true); // Allow all in development; restrict in production if needed
+    else {
+      // In production, reject unknown origins; in dev, allow for convenience
+      if (process.env.NODE_ENV === "production") cb(new Error("CORS: origin not allowed"));
+      else cb(null, true);
+    }
   },
   credentials: true,
 }));
@@ -55,7 +59,15 @@ app.use((req, res, next) => {
 // Clean up rate limit map every 5 minutes
 setInterval(() => { const now = Date.now(); rateLimitMap.forEach((v, k) => { if (now > v.reset) rateLimitMap.delete(k); }); }, 300000);
 
-app.use(express.json({ limit: "10mb" }));
+// Save raw body for webhook HMAC verification BEFORE json parsing consumes the stream
+app.use(express.json({
+  limit: "10mb",
+  verify: (req: any, _res, buf) => {
+    if (req.path?.includes("/webhook")) {
+      req.rawBody = buf.toString("utf8");
+    }
+  },
+}));
 app.use(cookieParser());
 
 // Health check

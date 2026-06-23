@@ -80,10 +80,15 @@ export function haversineDistance(
 }
 
 // ─── AES-256 ENCRYPTION FOR BANKING ───
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "0123456789abcdef0123456789abcdef"; // 32 bytes
+// SECURITY: No fallback — if ENCRYPTION_KEY is missing, crash at startup rather than encrypt with a public key
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 32) {
+  console.warn("[SECURITY] ENCRYPTION_KEY missing or wrong length (need 32 chars). Banking encryption will fail.");
+}
 const IV_LENGTH = 16;
 
 export function encrypt(text: string): string {
+  if (!ENCRYPTION_KEY) throw new Error("ENCRYPTION_KEY not configured");
   const iv = crypto.randomBytes(IV_LENGTH);
   const cipher = crypto.createCipheriv("aes-256-cbc", Buffer.from(ENCRYPTION_KEY, "utf-8"), iv);
   let encrypted = cipher.update(text, "utf8", "hex");
@@ -92,6 +97,7 @@ export function encrypt(text: string): string {
 }
 
 export function decrypt(text: string): string {
+  if (!ENCRYPTION_KEY) throw new Error("ENCRYPTION_KEY not configured");
   const [ivHex, encryptedHex] = text.split(":");
   if (!ivHex || !encryptedHex) return text;
   const iv = Buffer.from(ivHex, "hex");
@@ -115,7 +121,11 @@ export function verifyYocoSignature(payload: string, signature: string, secret: 
   const hmac = crypto.createHmac("sha256", secret);
   hmac.update(payload);
   const expected = hmac.digest("hex");
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+  // timingSafeEqual requires equal-length buffers — return false if lengths differ
+  const sigBuf = Buffer.from(signature);
+  const expBuf = Buffer.from(expected);
+  if (sigBuf.length !== expBuf.length) return false;
+  return crypto.timingSafeEqual(sigBuf, expBuf);
 }
 
 // ─── PAYSTACK SIGNATURE VERIFICATION ───

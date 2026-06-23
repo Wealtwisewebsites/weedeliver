@@ -9,7 +9,8 @@ const registerSchema = z.object({
   password: z.string().min(6),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
-  role: z.enum(["CUSTOMER", "DISPENSARY", "DRIVER", "ADMIN"]).optional().default("CUSTOMER"),
+  // SECURITY: ADMIN role forbidden via public registration — create admins via DB seed only
+  role: z.enum(["CUSTOMER", "DISPENSARY", "DRIVER"]).optional().default("CUSTOMER"),
 });
 
 const loginSchema = z.object({

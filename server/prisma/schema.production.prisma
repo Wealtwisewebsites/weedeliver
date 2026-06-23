@@ -1,0 +1,238 @@
+// PRODUCTION SCHEMA - use this for Railway/Supabase deployment
+// Steps:
+//   1. Copy this over schema.prisma before deploying
+//   2. Set DATABASE_URL + DIRECT_URL in Railway environment variables  
+//   3. Push: git add -A && git push
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole { CUSTOMER DISPENSARY DRIVER ADMIN }
+enum OrderStatus { PENDING CONFIRMED PREPARING READY_FOR_PICKUP OUT_FOR_DELIVERY DELIVERED CANCELLED REFUNDED }
+enum PaymentProvider { YOCO PAYSTACK SNAPSCAN EFT CASH }
+enum PaymentStatus { PENDING SUCCESSFUL FAILED REFUNDED }
+enum ProductCategory { INDOOR_FLOWER GREENHOUSE_FLOWER OUTDOOR_FLOWER PRE_ROLL EDIBLE CONCENTRATE TINCTURE TOPICAL ACCESSORY SEED CLONE }
+enum StrainType { SATIVA INDICA HYBRID CBD }
+enum MembershipType { FREE PAID }
+
+model User {
+  id String @id @default(uuid())
+  email String @unique
+  phone String? @unique
+  passwordHash String
+  role UserRole @default(CUSTOMER)
+  firstName String
+  lastName String
+  dateOfBirth DateTime?
+  isVerified Boolean @default(false)
+  isAgeVerified Boolean @default(false)
+  oauthProvider String?
+  oauthId String?
+  profileImageUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  dispensary Dispensary?
+  driverProfile Driver?
+  orders Order[] @relation("CustomerOrders")
+  reviews Review[]
+  payments Payment[]
+  memberships Membership[]
+  refreshTokens RefreshToken[]
+  addresses Address[]
+}
+
+model RefreshToken {
+  id String @id @default(uuid())
+  token String @unique
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Address {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label String @default("Home")
+  street String
+  suburb String
+  city String
+  province String
+  postalCode String
+  lat Decimal?
+  lng Decimal?
+  isDefault Boolean @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Dispensary {
+  id String @id @default(uuid())
+  userId String @unique
+  user User @relation(fields: [userId], references: [id])
+  name String
+  slug String @unique
+  bio String?
+  tagline String?
+  logoUrl String?
+  bannerUrl String?
+  address String
+  city String
+  province String
+  lat Decimal?
+  lng Decimal?
+  deliveryRadius Int @default(10)
+  deliveryFee Decimal @default(35)
+  minimumOrder Decimal @default(100)
+  operatingHours Json?
+  isApproved Boolean @default(false)
+  isActive Boolean @default(true)
+  membershipPrice Decimal @default(0)
+  membershipType MembershipType @default(FREE)
+  socialLinks Json?
+  banking Json?
+  rating Decimal @default(0)
+  reviewCount Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  products Product[]
+  orders Order[]
+  reviews Review[]
+  memberships Membership[]
+  drivers Driver[]
+}
+
+model Product {
+  id String @id @default(uuid())
+  dispensaryId String
+  dispensary Dispensary @relation(fields: [dispensaryId], references: [id])
+  name String
+  slug String
+  description String?
+  category ProductCategory @default(INDOOR_FLOWER)
+  price Decimal
+  unit String @default("per gram")
+  thcPercent Decimal?
+  cbdPercent Decimal?
+  strainType StrainType?
+  effectSpectrum Int?
+  imageUrl String?
+  stock Int @default(0)
+  isActive Boolean @default(true)
+  isFeatured Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orderItems OrderItem[]
+}
+
+model Order {
+  id String @id @default(uuid())
+  customerId String
+  customer User @relation("CustomerOrders", fields: [customerId], references: [id])
+  dispensaryId String
+  dispensary Dispensary @relation(fields: [dispensaryId], references: [id])
+  driverId String?
+  driver Driver? @relation(fields: [driverId], references: [id])
+  status OrderStatus @default(PENDING)
+  subtotal Decimal
+  deliveryFee Decimal
+  total Decimal
+  deliveryAddress Json
+  notes String?
+  confirmedAt DateTime?
+  pickedUpAt DateTime?
+  deliveredAt DateTime?
+  cancelledAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  items OrderItem[]
+  payment Payment[]
+  tracking Tracking[]
+  review Review?
+}
+
+model OrderItem {
+  id String @id @default(uuid())
+  orderId String
+  order Order @relation(fields: [orderId], references: [id])
+  productId String
+  product Product @relation(fields: [productId], references: [id])
+  quantity Int
+  unitPrice Decimal
+  total Decimal
+}
+
+model Payment {
+  id String @id @default(uuid())
+  orderId String?
+  order Order? @relation(fields: [orderId], references: [id])
+  userId String
+  user User @relation(fields: [userId], references: [id])
+  provider PaymentProvider
+  amount Decimal
+  status PaymentStatus @default(PENDING)
+  providerRef String?
+  metadata Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Driver {
+  id String @id @default(uuid())
+  userId String @unique
+  user User @relation(fields: [userId], references: [id])
+  dispensaryId String?
+  dispensary Dispensary? @relation(fields: [dispensaryId], references: [id])
+  vehicleType String?
+  licensePlate String?
+  isAvailable Boolean @default(false)
+  isApproved Boolean @default(false)
+  currentLat Decimal?
+  currentLng Decimal?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders Order[]
+}
+
+model Tracking {
+  id String @id @default(uuid())
+  orderId String
+  order Order @relation(fields: [orderId], references: [id])
+  status String
+  lat Decimal?
+  lng Decimal?
+  message String?
+  createdAt DateTime @default(now())
+}
+
+model Review {
+  id String @id @default(uuid())
+  orderId String @unique
+  order Order @relation(fields: [orderId], references: [id])
+  customerId String
+  customer User @relation(fields: [customerId], references: [id])
+  dispensaryId String
+  dispensary Dispensary @relation(fields: [dispensaryId], references: [id])
+  rating Int
+  comment String?
+  createdAt DateTime @default(now())
+}
+
+model Membership {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields: [userId], references: [id])
+  dispensaryId String
+  dispensary Dispensary @relation(fields: [dispensaryId], references: [id])
+  isActive Boolean @default(true)
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  @@unique([userId, dispensaryId])
+}

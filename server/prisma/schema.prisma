@@ -8,7 +8,7 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ─── USERS ───
+// â”€â”€â”€ USERS â”€â”€â”€
 model User {
   id              String    @id @default(uuid())
   email           String    @unique
@@ -39,7 +39,7 @@ model User {
   @@index([role])
 }
 
-// ─── DISPENSARIES ───
+// â”€â”€â”€ DISPENSARIES â”€â”€â”€
 model Dispensary {
   id              String     @id @default(uuid())
   userId          String     @unique
@@ -80,7 +80,7 @@ model Dispensary {
   @@index([isApproved, isActive])
 }
 
-// ─── PRODUCTS ───
+// â”€â”€â”€ PRODUCTS â”€â”€â”€
 model Product {
   id             String    @id @default(uuid())
   dispensaryId   String
@@ -108,7 +108,7 @@ model Product {
   @@index([category])
 }
 
-// ─── MEMBERSHIPS ───
+// â”€â”€â”€ MEMBERSHIPS â”€â”€â”€
 model Membership {
   id            String    @id @default(uuid())
   userId        String
@@ -129,7 +129,7 @@ model Membership {
   @@index([dispensaryId])
 }
 
-// ─── ORDERS ───
+// â”€â”€â”€ ORDERS â”€â”€â”€
 model Order {
   id                  String      @id @default(uuid())
   customerId          String
@@ -170,7 +170,7 @@ model Order {
   @@index([status])
 }
 
-// ─── ORDER ITEMS ───
+// â”€â”€â”€ ORDER ITEMS â”€â”€â”€
 model OrderItem {
   id          String  @id @default(uuid())
   orderId     String
@@ -184,7 +184,7 @@ model OrderItem {
   @@index([orderId])
 }
 
-// ─── PAYMENTS ───
+// â”€â”€â”€ PAYMENTS â”€â”€â”€
 model Payment {
   id           String    @id @default(uuid())
   orderId      String?
@@ -203,7 +203,7 @@ model Payment {
   @@index([userId])
 }
 
-// ─── DELIVERY TRACKING ───
+// â”€â”€â”€ DELIVERY TRACKING â”€â”€â”€
 model DeliveryTracking {
   id         String   @id @default(uuid())
   orderId    String   @unique
@@ -219,7 +219,7 @@ model DeliveryTracking {
   updatedAt  DateTime @updatedAt
 }
 
-// ─── DRIVERS ───
+// â”€â”€â”€ DRIVERS â”€â”€â”€
 model Driver {
   id              String   @id @default(uuid())
   userId          String   @unique
@@ -236,7 +236,7 @@ model Driver {
   updatedAt       DateTime @updatedAt
 }
 
-// ─── SUPPORT TICKETS ───
+// â”€â”€â”€ SUPPORT TICKETS â”€â”€â”€
 model SupportTicket {
   id         String   @id @default(uuid())
   userId     String
@@ -254,7 +254,7 @@ model SupportTicket {
   @@index([status])
 }
 
-// ─── DISPENSARY BANKING ───
+// â”€â”€â”€ DISPENSARY BANKING â”€â”€â”€
 model DispensaryBanking {
   id                String     @id @default(uuid())
   dispensaryId      String     @unique
@@ -269,7 +269,7 @@ model DispensaryBanking {
   updatedAt         DateTime   @updatedAt
 }
 
-// ─── PAYOUTS ───
+// â”€â”€â”€ PAYOUTS â”€â”€â”€
 model Payout {
   id            String     @id @default(uuid())
   dispensaryId  String
@@ -289,3 +289,4 @@ model Payout {
   @@index([dispensaryId])
   @@index([status])
 }
+
