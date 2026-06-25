@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronRight, ShieldCheck, Truck, Lock, Clock, Store, Users,
-  Search, BadgeCheck, Sparkles, ArrowRight, MapPin,
+  Search, BadgeCheck, Sparkles, ArrowRight, MapPin, Zap, CreditCard,
 } from "lucide-react";
 import { LOGO_URL } from "../lib/logo";
 import { LeafIcon } from "../components/BrandLogo";
@@ -12,8 +12,27 @@ import { DISPENSARIES } from "../lib/mockData";
 import { useAuth } from "../context/AuthContext";
 
 const DISPLAY = { fontFamily: "'Outfit', sans-serif" };
+const ux = (id, w = 900) => `https://images.unsplash.com/${id}?w=${w}&q=70&auto=format&fit=crop`;
 
-// Scroll-reveal wrapper — compositor-friendly (opacity + transform), respects reduced motion.
+// Botanical/atmosphere photos used as textured backgrounds under brand overlays.
+const IMG = {
+  hero: "photo-1603909223429-69bb7101f420",
+  about: "photo-1556928045-16f7f50be0f3",
+  cta: "photo-1530028828-25e8270793c5",
+};
+
+// Background photo with a guaranteed gradient fallback — never shows a broken image.
+function Bg({ id, overlay, className = "" }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <div className={`absolute inset-0 overflow-hidden ${className}`} aria-hidden="true">
+      {!failed && <img src={ux(id)} alt="" onError={() => setFailed(true)} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />}
+      <div className="absolute inset-0" style={{ background: overlay }} />
+    </div>
+  );
+}
+
+// Scroll-reveal wrapper — compositor-friendly, respects reduced motion.
 function Reveal({ children, delay = 0, className = "" }) {
   const ref = useRef(null);
   const [shown, setShown] = useState(false);
@@ -50,10 +69,22 @@ const FEATURES = [
 
 const STATS = [
   { value: "100%", label: "Verified dispensaries" },
-  { value: "18+", label: "Age-verified access" },
+  { value: "30–45", label: "Min average delivery" },
   { value: "Live", label: "Order tracking" },
   { value: "ZAR", label: "Local payments" },
 ];
+
+const TRUST = [
+  { icon: ShieldCheck, label: "SSL secured checkout" },
+  { icon: BadgeCheck, label: "18+ age verified" },
+  { icon: Store, label: "Licensed dispensaries" },
+  { icon: Lock, label: "Encrypted payments" },
+];
+
+// Payment method badges — styled, trademark-safe pills.
+function PayBadge({ children, style }) {
+  return <div className="h-9 px-3.5 rounded-lg flex items-center justify-center text-xs font-bold shadow-sm border border-black/5" style={style}>{children}</div>;
+}
 
 export default function HomePage() {
   const nav = useNavigate();
@@ -74,10 +105,11 @@ export default function HomePage() {
   return (
     <div className="bg-gray-50" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       {/* ─── HERO ─────────────────────────────────────────── */}
-      <section className="relative overflow-hidden" style={{ background: "linear-gradient(135deg, #06220d, #0a2e12 35%, #1A7A2E 100%)" }}>
+      <section className="relative overflow-hidden">
+        <Bg id={IMG.hero} overlay="linear-gradient(135deg, rgba(6,34,13,0.94), rgba(10,46,18,0.92) 35%, rgba(26,122,46,0.88) 100%)" />
         <div className="absolute inset-0 opacity-[0.12]" style={{ backgroundImage: "radial-gradient(circle at 20% 40%, rgba(255,255,255,0.4) 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
-        <LeafIcon className="absolute -right-10 -top-10 w-72 h-72 text-white/[0.04] rotate-12" />
-        <LeafIcon className="absolute -left-16 bottom-0 w-64 h-64 text-white/[0.04] -rotate-45" />
+        <LeafIcon className="absolute -right-10 -top-10 w-72 h-72 text-white/[0.05] rotate-12" />
+        <LeafIcon className="absolute -left-16 bottom-0 w-64 h-64 text-white/[0.05] -rotate-45" />
         <div className="max-w-7xl mx-auto px-4 py-14 sm:py-20 md:py-28 relative">
           <div className="flex flex-col md:flex-row items-center gap-8 md:gap-10">
             <div className="flex-1 text-center md:text-left">
@@ -92,18 +124,23 @@ export default function HomePage() {
                 </h1>
               </Reveal>
               <Reveal delay={160}>
-                <p className="text-green-100/80 text-base sm:text-lg mb-7 max-w-xl mx-auto md:mx-0 leading-relaxed">
+                <p className="text-green-100/80 text-base sm:text-lg mb-6 max-w-xl mx-auto md:mx-0 leading-relaxed">
                   WeeDeliver connects you with verified South African dispensaries — browse menus, join as a member, and track your delivery in real time. Compliant, discreet, and effortless.
                 </p>
               </Reveal>
-              <Reveal delay={240}>
-                <div className="flex flex-wrap gap-3 justify-center md:justify-start">
+              <Reveal delay={220}>
+                <div className="flex flex-wrap gap-3 justify-center md:justify-start mb-5">
                   <button onClick={() => nav(currentUser ? "/browse" : "/login")} className="px-7 py-3.5 rounded-full bg-white text-green-800 font-bold text-sm sm:text-base shadow-xl hover:bg-green-50 hover:-translate-y-0.5 transition-all flex items-center gap-2">
                     {currentUser ? "Browse Dispensaries" : "Get Started"} <ArrowRight className="w-4 h-4" />
                   </button>
-                  <a href="#how-it-works" className="px-7 py-3.5 rounded-full bg-white/10 text-white font-bold text-sm sm:text-base border border-white/25 hover:bg-white/20 transition-all backdrop-blur-sm">
-                    How it works
-                  </a>
+                  <a href="#how-it-works" className="px-7 py-3.5 rounded-full bg-white/10 text-white font-bold text-sm sm:text-base border border-white/25 hover:bg-white/20 transition-all backdrop-blur-sm">How it works</a>
+                </div>
+              </Reveal>
+              <Reveal delay={280}>
+                <div className="flex flex-wrap gap-x-4 gap-y-2 justify-center md:justify-start text-green-100/90 text-xs font-semibold">
+                  {["18+ Verified", "Secure Checkout", "Live Tracking"].map(t => (
+                    <span key={t} className="inline-flex items-center gap-1.5"><BadgeCheck className="w-4 h-4 text-green-300" />{t}</span>
+                  ))}
                 </div>
               </Reveal>
             </div>
@@ -115,7 +152,7 @@ export default function HomePage() {
             </Reveal>
           </div>
         </div>
-        <svg className="block w-full h-12 sm:h-16 text-gray-50" viewBox="0 0 1440 80" preserveAspectRatio="none" fill="currentColor"><path d="M0,40 C360,90 1080,-10 1440,40 L1440,80 L0,80 Z" /></svg>
+        <svg className="block w-full h-12 sm:h-16 text-gray-50 relative" viewBox="0 0 1440 80" preserveAspectRatio="none" fill="currentColor"><path d="M0,40 C360,90 1080,-10 1440,40 L1440,80 L0,80 Z" /></svg>
       </section>
 
       {/* ─── STATS STRIP ──────────────────────────────────── */}
@@ -130,6 +167,33 @@ export default function HomePage() {
             </Reveal>
           ))}
         </div>
+      </section>
+
+      {/* ─── FAST DELIVERY BAND ───────────────────────────── */}
+      <section className="max-w-7xl mx-auto px-4 pt-12 sm:pt-16">
+        <Reveal>
+          <div className="relative overflow-hidden rounded-3xl p-8 sm:p-10" style={{ background: "linear-gradient(120deg, #15803d, #166534)" }}>
+            <Bg id={IMG.cta} overlay="linear-gradient(120deg, rgba(21,128,61,0.92), rgba(6,34,13,0.85))" />
+            <LeafIcon className="absolute -right-8 -bottom-10 w-52 h-52 text-white/10" />
+            <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-6 justify-between">
+              <div className="flex items-start gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center flex-shrink-0 backdrop-blur-sm"><Zap className="w-7 h-7 text-green-200" /></div>
+                <div>
+                  <h2 className="text-2xl sm:text-3xl font-black text-white leading-tight" style={DISPLAY}>Lightning-fast delivery</h2>
+                  <p className="text-green-100/85 text-sm sm:text-base mt-1 max-w-lg">Average <strong className="text-white">30–45 minutes</strong> from order to door, with live driver tracking and same-day delivery across major cities.</p>
+                </div>
+              </div>
+              <div className="flex gap-6 flex-shrink-0">
+                {[["30–45", "min avg"], ["Same", "day"], ["Live", "tracking"]].map(([a, b]) => (
+                  <div key={b} className="text-center">
+                    <div className="text-xl sm:text-2xl font-black text-white" style={DISPLAY}>{a}</div>
+                    <div className="text-[10px] sm:text-xs text-green-200/80 font-medium uppercase tracking-wide">{b}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Reveal>
       </section>
 
       {/* ─── ABOUT / THE POINT ────────────────────────────── */}
@@ -155,9 +219,9 @@ export default function HomePage() {
             </ul>
           </Reveal>
           <Reveal delay={120}>
-            <div className="relative rounded-3xl overflow-hidden p-8 sm:p-10 min-h-[300px] flex flex-col justify-end" style={{ background: "linear-gradient(150deg, #1A7A2E, #0a2e12)" }}>
+            <div className="relative rounded-3xl overflow-hidden p-8 sm:p-10 min-h-[320px] flex flex-col justify-end">
+              <Bg id={IMG.about} overlay="linear-gradient(150deg, rgba(26,122,46,0.82), rgba(10,46,18,0.92))" />
               <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "radial-gradient(circle at 70% 20%, rgba(255,255,255,0.5) 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
-              <LeafIcon className="absolute right-4 top-4 w-40 h-40 text-white/10" />
               <img src={LOGO_URL} alt="" className="absolute right-6 top-6 h-24 sm:h-28 opacity-90 drop-shadow-xl" />
               <div className="relative">
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-green-100 text-[11px] font-semibold mb-3 backdrop-blur-sm"><MapPin className="w-3 h-3" />Nationwide coverage</div>
@@ -211,8 +275,40 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ─── TRUST + PAYMENTS ─────────────────────────────── */}
+      <section className="bg-white border-y border-gray-100 py-14 sm:py-16">
+        <div className="max-w-7xl mx-auto px-4">
+          <Reveal>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+              {TRUST.map(t => (
+                <div key={t.label} className="flex items-center gap-3 justify-center md:justify-start">
+                  <span className="flex-shrink-0 w-10 h-10 rounded-full bg-green-50 text-green-700 flex items-center justify-center"><t.icon className="w-5 h-5" /></span>
+                  <span className="text-sm font-bold text-gray-800">{t.label}</span>
+                </div>
+              ))}
+            </div>
+          </Reveal>
+          <Reveal delay={120}>
+            <div className="text-center">
+              <div className="inline-flex items-center gap-2 text-xs font-bold text-gray-500 tracking-widest uppercase mb-5"><CreditCard className="w-4 h-4" />Secure payment options</div>
+              <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3">
+                <PayBadge style={{ background: "#1434CB", color: "#fff" }}><span style={{ fontStyle: "italic", letterSpacing: "0.5px" }}>VISA</span></PayBadge>
+                <PayBadge style={{ background: "#fff" }}>
+                  <span className="relative inline-flex items-center"><span className="w-4 h-4 rounded-full" style={{ background: "#EB001B" }} /><span className="w-4 h-4 rounded-full -ml-1.5" style={{ background: "#F79E1B", opacity: 0.9 }} /></span>
+                  <span className="ml-1.5 text-gray-700">Mastercard</span>
+                </PayBadge>
+                <PayBadge style={{ background: "#0f1b2d", color: "#fff" }}>Yoco</PayBadge>
+                <PayBadge style={{ background: "#00A651", color: "#fff" }}>Instant EFT</PayBadge>
+                <PayBadge style={{ background: "#E4002B", color: "#fff" }}>SnapScan</PayBadge>
+              </div>
+              <p className="text-xs text-gray-400 mt-4">All payments are encrypted and processed by PCI-compliant providers.</p>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
       {/* ─── MARKETPLACE CTA (dispensaries + drivers) ─────── */}
-      <section className="max-w-7xl mx-auto px-4 pb-16 sm:pb-24">
+      <section className="max-w-7xl mx-auto px-4 py-16 sm:py-24">
         <div className="grid md:grid-cols-2 gap-5">
           {[
             { icon: Store, tag: "For dispensaries", title: "Grow your dispensary online", body: "List your menu, reach new members, and manage orders, stock, and payouts from one dashboard.", cta: "Partner with us" },
