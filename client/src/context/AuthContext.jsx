@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { api } from "../lib/api";
-import { MOCK_USERS } from "../lib/mockData";
 
 const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
@@ -50,13 +49,8 @@ export function AuthProvider({ children }) {
     setAgeVerified(false);
   }, []);
 
-  const switchRole = useCallback((role) => {
-    const u = MOCK_USERS.find(x => x.role === role);
-    if (u) setCurrentUser(u);
-  }, []);
-
   return (
-    <AuthContext.Provider value={{ currentUser, setCurrentUser, ageVerified, setAgeVerified, authLoading, login, logout, register, switchRole }}>
+    <AuthContext.Provider value={{ currentUser, setCurrentUser, ageVerified, setAgeVerified, authLoading, login, logout, register }}>
       {children}
     </AuthContext.Provider>
   );

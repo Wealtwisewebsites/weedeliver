@@ -70,7 +70,7 @@ export default function LoginPage() {
           <div><label className="block text-[11px] text-gray-500 mb-1">Password</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 6 characters" className="w-full px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-green-500" onKeyDown={e => e.key === "Enter" && handleSubmit()} /></div>
           {error && <div className="bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-700 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />{error}</div>}
           <button onClick={handleSubmit} disabled={loading || !email || !password} className={`w-full py-3 rounded-xl text-white font-bold text-sm shadow-lg transition ${loading ? "opacity-60" : "hover:shadow-xl"}`} style={{ background: "linear-gradient(135deg, #1A7A2E, #2d9a4a)" }}>{loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}</button>
-          <div className="text-center text-[11px] text-gray-400 pt-1">{mode === "login" ? "Demo: customer@test.com / password123" : "You can also register as a Dispensary or Driver"}</div>
+          <div className="text-center text-[11px] text-gray-400 pt-1">{mode === "login" ? "Welcome back to WeeDeliver" : "You can also register as a Dispensary or Driver"}</div>
         </div>
       </div>
     </div>
