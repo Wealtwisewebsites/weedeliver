@@ -21,20 +21,28 @@ app.use((_req, res, next) => {
 });
 
 // CORS — supports multiple origins for dev + production
+// Normalize by stripping any trailing slash so env-var typos don't break matching.
+const stripSlash = (s: string) => s.replace(/\/+$/, "");
 const allowedOrigins = [
-  process.env.CLIENT_URL || "http://localhost:5173",
+  process.env.CLIENT_URL,
+  "https://weedeliver-full.vercel.app",
   "http://localhost:5173",
   "http://localhost:3000",
-].filter(Boolean);
+]
+  .filter((o): o is string => Boolean(o))
+  .map(stripSlash);
 
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.some(o => origin.startsWith(o))) cb(null, true);
-    else {
-      // In production, reject unknown origins; in dev, allow for convenience
-      if (process.env.NODE_ENV === "production") cb(new Error("CORS: origin not allowed"));
-      else cb(null, true);
-    }
+    if (!origin) return cb(null, true);
+    const normalized = stripSlash(origin);
+    const allowed =
+      allowedOrigins.includes(normalized) ||
+      // Allow this project's Vercel preview deployments
+      /^https:\/\/weedeliver-full-[a-z0-9-]+\.vercel\.app$/.test(normalized);
+    if (allowed || process.env.NODE_ENV !== "production") return cb(null, true);
+    // Reject without throwing — avoids a 500 on disallowed origins
+    return cb(null, false);
   },
   credentials: true,
 }));
