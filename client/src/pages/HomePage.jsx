@@ -21,6 +21,16 @@ const IMG = {
   cta: "photo-1530028828-25e8270793c5",
 };
 
+// Gallery tiles — verified-loading botanical imagery, framed with brand overlays + captions.
+const GALLERY = [
+  { id: "photo-1603909223429-69bb7101f420", label: "Premium Flower", span: "col-span-2 row-span-2" },
+  { id: "photo-1556928045-16f7f50be0f3", label: "Edibles", span: "" },
+  { id: "photo-1605000797499-95a51c5269ae", label: "Concentrates", span: "" },
+  { id: "photo-1490750967868-88aa4486c946", label: "Wellness & CBD", span: "col-span-2" },
+  { id: "photo-1599819811279-d5ad9cccf838", label: "Pre-Rolls", span: "" },
+  { id: "photo-1518531933037-91b2f5f229cc", label: "Accessories", span: "" },
+];
+
 // Background photo with a guaranteed gradient fallback — never shows a broken image.
 function Bg({ id, overlay, className = "" }) {
   const [failed, setFailed] = useState(false);
@@ -28,6 +38,23 @@ function Bg({ id, overlay, className = "" }) {
     <div className={`absolute inset-0 overflow-hidden ${className}`} aria-hidden="true">
       {!failed && <img src={ux(id)} alt="" onError={() => setFailed(true)} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />}
       <div className="absolute inset-0" style={{ background: overlay }} />
+    </div>
+  );
+}
+
+// Gallery tile — image with brand overlay (lightens on hover), caption, and gradient fallback.
+function GalleryTile({ id, label, span }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <div className={`group relative overflow-hidden rounded-2xl ${span}`}>
+      {!failed
+        ? <img src={ux(id, 700)} alt={label} loading="lazy" onError={() => setFailed(true)} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+        : <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #1A7A2E, #0a2e12)" }} />}
+      <div className="absolute inset-0 transition-opacity duration-500 group-hover:opacity-60" style={{ background: "linear-gradient(to top, rgba(6,34,13,0.88) 0%, rgba(6,34,13,0.25) 55%, rgba(26,122,46,0.35) 100%)" }} />
+      <LeafIcon className="absolute top-3 right-3 w-5 h-5 text-white/50" />
+      <div className="absolute bottom-0 left-0 p-4">
+        <span className="text-white font-black text-sm sm:text-lg drop-shadow" style={DISPLAY}>{label}</span>
+      </div>
     </div>
   );
 }
@@ -272,6 +299,26 @@ export default function HomePage() {
               </div>
             </Reveal>
           ))}
+        </div>
+      </section>
+
+      {/* ─── GALLERY ──────────────────────────────────────── */}
+      <section className="bg-gray-900 py-16 sm:py-24 relative overflow-hidden">
+        <LeafIcon className="absolute -left-12 top-1/3 w-72 h-72 text-white/[0.03]" />
+        <div className="max-w-7xl mx-auto px-4 relative">
+          <Reveal className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
+            <div>
+              <span className="text-xs font-bold text-green-400 tracking-widest uppercase">Explore the range</span>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mt-3 leading-tight" style={DISPLAY}>A curated world of premium cannabis</h2>
+              <p className="text-gray-400 mt-3 max-w-lg">From top-shelf flower to edibles, concentrates, and wellness — discover what South Africa's best dispensaries have to offer.</p>
+            </div>
+            <button onClick={() => nav(currentUser ? "/browse" : "/login")} className="self-start sm:self-auto flex-shrink-0 px-6 py-3 rounded-full bg-green-500 text-white font-bold text-sm hover:bg-green-400 transition-all flex items-center gap-2">Browse all <ArrowRight className="w-4 h-4" /></button>
+          </Reveal>
+          <Reveal delay={120}>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4" style={{ gridAutoRows: "150px" }}>
+              {GALLERY.map(g => <GalleryTile key={g.label} id={g.id} label={g.label} span={g.span} />)}
+            </div>
+          </Reveal>
         </div>
       </section>
 
