@@ -1,10 +1,15 @@
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { useAuth } from "./AuthContext";
 
 const CartContext = createContext();
 export const useCart = () => useContext(CartContext);
 
 export function CartProvider({ children }) {
+  const { currentUser } = useAuth();
   const [cart, setCart] = useState([]);
+
+  // Carts are per-customer: clear whenever the logged-in account changes (login / logout / switch).
+  useEffect(() => { setCart([]); }, [currentUser?.id]);
 
   const addToCart = useCallback((product) => {
     setCart(prev => {

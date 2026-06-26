@@ -119,13 +119,14 @@ router.post("/initiate", authenticate, async (req: Request, res: Response) => {
             metadata: { orderId, paymentId: payment.id },
           }),
         });
-        const yocoData = await yocoRes.json();
+        const yocoData = await yocoRes.json().catch(() => ({}));
         if (yocoData.redirectUrl) {
           await prisma.payment.update({ where: { id: payment.id }, data: { providerRef: yocoData.id } });
           checkoutData.redirectUrl = yocoData.redirectUrl;
           checkoutData.checkoutId = yocoData.id;
         } else {
-          checkoutData.error = yocoData.errorMessage || yocoData.message || "Checkout creation failed";
+          console.error("[Yoco] checkout creation failed", yocoRes.status, JSON.stringify(yocoData).slice(0, 300));
+          checkoutData.error = yocoData.errorMessage || yocoData.message || yocoData.description || `Yoco checkout error (HTTP ${yocoRes.status})`;
         }
       } catch { checkoutData.error = "Payment provider temporarily unavailable"; }
 

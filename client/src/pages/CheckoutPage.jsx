@@ -3,27 +3,28 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, MapPin, CreditCard, AlertCircle, RefreshCw } from "lucide-react";
 import { formatZAR } from "../lib/formatters";
 import { api } from "../lib/api";
-import { DISPENSARIES } from "../lib/mockData";
-import { uid } from "../lib/formatters";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { useUI } from "../context/UIContext";
 
 export default function CheckoutPage() {
   const nav = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, setCurrentUser } = useAuth();
   const { cart, cartTotal, clearCart } = useCart();
   const { notify } = useUI();
   const [pay, setPay] = useState("yoco");
-  const [addr, setAddr] = useState("123 Main Rd, Cape Town");
+  const [addr, setAddr] = useState("");
+  const [dob, setDob] = useState("");
   const [processing, setProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState(null);
   const [cartDispensary, setCartDispensary] = useState(null);
 
+  const needsAge = currentUser && !currentUser.isAgeVerified;
+
   useEffect(() => {
     if (cart.length === 0) return;
     api("GET", "/dispensaries").then(res => {
-      const disps = res.ok && res.data ? res.data : DISPENSARIES;
+      const disps = res.ok && Array.isArray(res.data) ? res.data : [];
       setCartDispensary(disps.find(d => d.id === cart[0].dispensaryId) || null);
     });
   }, [cart.length > 0 ? cart[0].dispensaryId : null]);
@@ -34,41 +35,57 @@ export default function CheckoutPage() {
 
   const handlePlaceOrder = async () => {
     setPaymentError(null);
+    if (!addr.trim()) { setPaymentError("Please enter a delivery address."); return; }
     setProcessing(true);
 
-    const orderPayload = {
+    // 1. Age verification (18+) — required before any cannabis order can be placed.
+    if (needsAge) {
+      if (!dob) { setPaymentError("Please enter your date of birth to confirm you're 18 or older."); setProcessing(false); return; }
+      const ageRes = await api("POST", "/auth/verify-age", { dateOfBirth: dob });
+      if (!ageRes.ok) { setPaymentError(ageRes.data?.error || "You must be 18 or older to order."); setProcessing(false); return; }
+      setCurrentUser(u => (u ? { ...u, isAgeVerified: true } : u));
+    }
+
+    // 2. Ensure an active membership with this dispensary (auto-approved for free dispensaries).
+    const memRes = await api("POST", "/memberships", { dispensaryId: cart[0].dispensaryId });
+    if (!memRes.ok && memRes.status !== 400) {
+      setPaymentError(memRes.data?.error || "Couldn't join this dispensary. Please try again.");
+      setProcessing(false); return;
+    }
+
+    // 3. Create the order.
+    const orderRes = await api("POST", "/orders", {
       dispensaryId: cart[0].dispensaryId,
       deliveryAddress: addr,
-      paymentMethod: pay,
       items: cart.map(i => ({ productId: i.id, quantity: i.quantity })),
-    };
-
-    const orderRes = await api("POST", "/orders", orderPayload);
-    let orderId = orderRes.ok && orderRes.data?.id ? orderRes.data.id : uid("o");
-
-    if (pay === "yoco" || pay === "paystack") {
-      try {
-        const res = await api("POST", "/payments/initiate", { orderId, provider: pay.toUpperCase() });
-        if (res.data?.redirectUrl) {
-          notify(`Redirecting to ${pay === "yoco" ? "Yoco" : "Paystack"} checkout...`);
-          clearCart();
-          window.location.href = res.data.redirectUrl;
-          return;
-        } else {
-          notify(`Order #${String(orderId).slice(0,8).toUpperCase()} placed! (Demo mode)`);
-          clearCart();
-          nav(`/order/${orderId}`);
-        }
-      } catch {
-        notify(`Order #${String(orderId).slice(0,8).toUpperCase()} placed! (Demo mode)`);
-        clearCart();
-        nav(`/order/${orderId}`);
-      }
-    } else {
-      notify(`Order #${String(orderId).slice(0,8).toUpperCase()} placed!`);
-      clearCart();
-      nav(`/order/${orderId}`);
+    });
+    if (!orderRes.ok || !orderRes.data?.id) {
+      const msg = orderRes.data?.requiresMembership
+        ? "This dispensary requires an approved membership before you can order."
+        : orderRes.data?.requiresAgeVerification
+          ? "Please verify your age to place an order."
+          : orderRes.data?.error || "Couldn't place your order. Please try again.";
+      setPaymentError(msg); setProcessing(false); return;
     }
+    const orderId = orderRes.data.id;
+
+    // 4. Card / EFT — start the payment and redirect to the provider's checkout.
+    if (pay === "yoco" || pay === "paystack") {
+      const res = await api("POST", "/payments/initiate", { orderId, provider: pay.toUpperCase() });
+      if (res.ok && res.data?.redirectUrl) {
+        notify(`Redirecting to ${pay === "yoco" ? "Yoco" : "Paystack"} checkout…`);
+        clearCart();
+        window.location.href = res.data.redirectUrl;
+        return;
+      }
+      setPaymentError(res.data?.error || "Couldn't start the payment. Your order is saved — please try paying again.");
+      setProcessing(false);
+      return;
+    }
+
+    // Other methods (SnapScan / EFT) — go to the order page for instructions.
+    clearCart();
+    nav(`/order/${orderId}`);
     setProcessing(false);
   };
 
@@ -77,7 +94,14 @@ export default function CheckoutPage() {
       <button onClick={() => nav("/cart")} className="flex items-center gap-1 text-gray-500 text-xs sm:text-sm mb-2 sm:mb-3"><ArrowLeft className="w-4 h-4" /> Cart</button>
       <h1 className="text-lg sm:text-xl font-black mb-3 sm:mb-4" style={{ fontFamily: "'Outfit', sans-serif" }}>Checkout</h1>
       <div className="space-y-4">
-        <div className="bg-white rounded-xl p-4 border"><h3 className="font-bold text-sm mb-2"><MapPin className="w-4 h-4 inline text-green-600 mr-1" />Delivery Address</h3><input value={addr} onChange={e => setAddr(e.target.value)} className="w-full px-3 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-green-500 outline-none" /></div>
+        <div className="bg-white rounded-xl p-4 border"><h3 className="font-bold text-sm mb-2"><MapPin className="w-4 h-4 inline text-green-600 mr-1" />Delivery Address</h3><input value={addr} onChange={e => setAddr(e.target.value)} placeholder="Street, suburb, city" className="w-full px-3 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-green-500 outline-none" /></div>
+        {needsAge && (
+          <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+            <h3 className="font-bold text-sm mb-1 text-amber-800">Age Verification (18+)</h3>
+            <p className="text-[11px] text-amber-700 mb-2">Cannabis is for adults only. Confirm your date of birth to place your first order.</p>
+            <input type="date" value={dob} onChange={e => setDob(e.target.value)} max={new Date().toISOString().slice(0, 10)} className="w-full px-3 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white" />
+          </div>
+        )}
         <div className="bg-white rounded-xl p-4 border"><h3 className="font-bold text-sm mb-2"><CreditCard className="w-4 h-4 inline text-green-600 mr-1" />Payment Method</h3>
           {[{ id: "yoco", l: "Pay by Card", sub: "Yoco - Visa, Mastercard, Amex", ic: "\u{1F4B3}" }, { id: "paystack", l: "EFT / Card", sub: "Paystack - Instant EFT or card", ic: "\u{1F3E6}" }].map(m => (
             <button key={m.id} onClick={() => setPay(m.id)} className={`w-full p-3 rounded-xl border text-left flex items-center gap-3 mb-2 transition-all ${pay === m.id ? "border-green-500 bg-green-50 ring-1 ring-green-500 shadow-sm" : "border-gray-200 hover:border-gray-300"}`}>
