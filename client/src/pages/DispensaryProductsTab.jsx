@@ -4,6 +4,9 @@ import { formatZAR } from "../lib/formatters";
 import { api } from "../lib/api";
 import { EMPTY_PRODUCT, CATEGORY_LABELS, CATEGORY_ICONS, STRAIN_COLORS } from "../lib/constants";
 import { useUI } from "../context/UIContext";
+import ImageUploadBox from "../components/ImageUploadBox";
+
+const firstImage = (imageUrls) => { try { return JSON.parse(imageUrls || "[]")[0] || ""; } catch { return ""; } };
 
 export default function DispensaryProductsTab({ myIds, dispensaryId }) {
   const { notify } = useUI();
@@ -25,9 +28,9 @@ export default function DispensaryProductsTab({ myIds, dispensaryId }) {
 
   const myProducts = products.filter(p => myIds.includes(p.dispensaryId));
 
-  const openAdd = () => { setForm({ ...EMPTY_PRODUCT }); setEditId(null); setShowForm(true); };
+  const openAdd = () => { setForm({ ...EMPTY_PRODUCT, imageUrl: "" }); setEditId(null); setShowForm(true); };
   const openEdit = (p) => {
-    setForm({ name: p.name, category: p.category, strainType: p.strainType || "HYBRID", price: String(p.price), unit: p.unit || "per gram", stock: String(p.stock), description: p.description || "", thcPercent: p.thcPercent != null ? String(p.thcPercent) : "", cbdPercent: p.cbdPercent != null ? String(p.cbdPercent) : "", effectSpectrum: p.effectSpectrum || 5 });
+    setForm({ name: p.name, category: p.category, strainType: p.strainType || "HYBRID", price: String(p.price), unit: p.unit || "per gram", stock: String(p.stock), description: p.description || "", thcPercent: p.thcPercent != null ? String(p.thcPercent) : "", cbdPercent: p.cbdPercent != null ? String(p.cbdPercent) : "", effectSpectrum: p.effectSpectrum || 5, imageUrl: firstImage(p.imageUrls) });
     setEditId(p.id); setShowForm(true);
   };
 
@@ -35,7 +38,8 @@ export default function DispensaryProductsTab({ myIds, dispensaryId }) {
     if (!form.name || !form.price || !form.stock) { notify("Name, price and stock are required", "error"); return; }
     setSaving(true);
     const slug = form.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    const payload = { ...form, dispensaryId, slug, price: Number(form.price), stock: Number(form.stock), thcPercent: form.thcPercent ? Number(form.thcPercent) : null, cbdPercent: form.cbdPercent ? Number(form.cbdPercent) : null, strainType: needsStrain ? form.strainType : null };
+    const { imageUrl, ...rest } = form;
+    const payload = { ...rest, dispensaryId, slug, price: Number(form.price), stock: Number(form.stock), thcPercent: form.thcPercent ? Number(form.thcPercent) : null, cbdPercent: form.cbdPercent ? Number(form.cbdPercent) : null, strainType: needsStrain ? form.strainType : null, imageUrls: imageUrl ? JSON.stringify([imageUrl]) : "[]" };
 
     if (editId) {
       const res = await api("PUT", `/products/${editId}`, payload);
@@ -150,6 +154,11 @@ export default function DispensaryProductsTab({ myIds, dispensaryId }) {
               <div>
                 <label className="block text-[11px] font-bold text-gray-500 mb-1 uppercase tracking-wide">Product Name *</label>
                 <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Purple Haze, OG Kush..." className="w-full px-3 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-green-500 outline-none" />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-gray-500 mb-2 uppercase tracking-wide">Product Image</label>
+                <ImageUploadBox current={form.imageUrl} onUpload={(url) => setForm({ ...form, imageUrl: url })} label="Upload product photo" aspectHint="Square recommended" folder="products" className="w-full h-40 rounded-xl overflow-hidden border border-gray-200" />
               </div>
 
               <div>

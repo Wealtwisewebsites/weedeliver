@@ -133,22 +133,37 @@ router.post("/", authenticate, requireRole("DISPENSARY"), async (req: Request, r
 });
 
 // ─── UPDATE DISPENSARY (incl. operatingHours) ───
+// Whitelist updatable scalar columns so computed/relation fields (isOpen, distance,
+// _count, banking, profileUrl, openNow, etc.) are safely ignored instead of crashing Prisma.
+const UPDATABLE_FIELDS = ["name", "bio", "tagline", "logoUrl", "bannerUrl", "address", "city", "province", "membershipType", "isActive"];
+const NUMERIC_FIELDS = ["deliveryRadius", "deliveryFee", "minimumOrder", "membershipPrice"];
+
 router.put("/:id", authenticate, requireOwner, async (req: Request, res: Response) => {
   try {
-    const body = { ...req.body };
-    if (body.operatingHours) {
-      if (typeof body.operatingHours === "object") {
-        operatingHoursSchema.parse(body.operatingHours);
-        body.operatingHours = JSON.stringify(body.operatingHours);
+    const src = req.body || {};
+    const data: any = {};
+
+    for (const key of UPDATABLE_FIELDS) {
+      if (src[key] !== undefined) data[key] = src[key];
+    }
+    for (const key of NUMERIC_FIELDS) {
+      if (src[key] !== undefined && src[key] !== null && src[key] !== "") data[key] = Number(src[key]);
+    }
+    if (src.operatingHours !== undefined) {
+      if (src.operatingHours && typeof src.operatingHours === "object") {
+        operatingHoursSchema.parse(src.operatingHours);
+        data.operatingHours = JSON.stringify(src.operatingHours);
+      } else if (typeof src.operatingHours === "string") {
+        data.operatingHours = src.operatingHours;
       }
     }
-    if (body.socialLinks && typeof body.socialLinks === "object") {
-      body.socialLinks = JSON.stringify(body.socialLinks);
+    if (src.socialLinks !== undefined) {
+      data.socialLinks = src.socialLinks && typeof src.socialLinks === "object"
+        ? JSON.stringify(src.socialLinks)
+        : src.socialLinks;
     }
-    // Strip unknown/relation fields Prisma can't update directly
-    delete body.id; delete body.userId; delete body.user; delete body.products;
-    delete body.memberships; delete body.orders; delete body.banking; delete body.payouts; delete body._count;
-    const dispensary = await prisma.dispensary.update({ where: { id: req.params.id }, data: body });
+
+    const dispensary = await prisma.dispensary.update({ where: { id: req.params.id }, data });
     res.json(enrichDispensary(dispensary));
   } catch (err: any) {
     res.status(400).json({ error: err.message });

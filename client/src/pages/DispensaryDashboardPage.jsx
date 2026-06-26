@@ -11,6 +11,18 @@ import DispensaryProductsTab from "./DispensaryProductsTab";
 import { useAuth } from "../context/AuthContext";
 import { useUI } from "../context/UIContext";
 
+// operatingHours & socialLinks arrive from the API as JSON strings — parse them to objects for editing.
+const safeParse = (val, fallback) => {
+  if (val && typeof val === "object") return val;
+  if (typeof val === "string") { try { return JSON.parse(val); } catch { return fallback; } }
+  return fallback;
+};
+const hydrateDisp = (d) => ({
+  ...d,
+  operatingHours: safeParse(d.operatingHours, {}),
+  socialLinks: safeParse(d.socialLinks, {}),
+});
+
 export default function DispensaryDashboardPage() {
   const { currentUser } = useAuth();
   const { notify, markRead } = useUI();
@@ -42,7 +54,7 @@ export default function DispensaryDashboardPage() {
   const rev = myOrders.filter(o => o.status === "DELIVERED").reduce((s, o) => s + Number(o.total || 0), 0);
 
   const [editDisp, setEditDisp] = useState(null);
-  useEffect(() => { if (myDisps.length > 0 && !editDisp) setEditDisp({ ...myDisps[0] }); }, [myDisps]);
+  useEffect(() => { if (myDisps.length > 0 && !editDisp) setEditDisp(hydrateDisp(myDisps[0])); }, [myDisps]);
 
   const [creating, setCreating] = useState(false);
   const [newDisp, setNewDisp] = useState({ name: "", slug: "", city: "", province: "Gauteng", address: "", bio: "", tagline: "", deliveryFee: 35, minimumOrder: 100, deliveryRadius: 15, deliveryTime: "25-35 min" });
@@ -72,10 +84,45 @@ export default function DispensaryDashboardPage() {
     }
   };
 
+  const [savingStore, setSavingStore] = useState(false);
   const saveStorefront = async () => {
-    if (!editDisp) return;
-    await api("PUT", `/dispensaries/${editDisp.id}`, editDisp);
-    setMyDisps(prev => prev.map(d => d.id === editDisp.id ? { ...d, ...editDisp } : d));
+    if (!editDisp || savingStore) return;
+    setSavingStore(true);
+    const payload = {
+      name: editDisp.name,
+      tagline: editDisp.tagline,
+      bio: editDisp.bio,
+      bannerUrl: editDisp.bannerUrl,
+      logoUrl: editDisp.logoUrl,
+      deliveryFee: editDisp.deliveryFee,
+      minimumOrder: editDisp.minimumOrder,
+      deliveryRadius: editDisp.deliveryRadius,
+      operatingHours: editDisp.operatingHours,
+      socialLinks: editDisp.socialLinks,
+    };
+    const res = await api("PUT", `/dispensaries/${editDisp.id}`, payload);
+    if (!res.ok) { notify(res.data?.error || "Failed to save changes", "error"); setSavingStore(false); return; }
+
+    // Banking has its own encrypted endpoint — only save when all fields are filled in.
+    const b = editDisp.banking;
+    if (b && b.bankName && b.accountHolderName && b.accountNumber && b.branchCode && b.accountType) {
+      const bres = await api("PUT", `/dispensaries/${editDisp.id}/banking`, {
+        bankName: b.bankName,
+        accountHolderName: b.accountHolderName,
+        accountNumber: String(b.accountNumber),
+        branchCode: String(b.branchCode),
+        accountType: b.accountType,
+      });
+      if (!bres.ok) notify(bres.data?.error || "Store saved, but banking details didn't save", "error");
+    }
+
+    // Reload canonical state from the server so the UI reflects exactly what persisted.
+    const reload = await api("GET", "/dispensaries/mine");
+    if (reload.ok && Array.isArray(reload.data) && reload.data.length > 0) {
+      setMyDisps(reload.data);
+      setEditDisp({ ...hydrateDisp(reload.data[0]), banking: editDisp.banking });
+    }
+    setSavingStore(false);
     notify("Changes saved!");
   };
 
@@ -160,7 +207,7 @@ export default function DispensaryDashboardPage() {
                 {editDisp.openNow && <div className="absolute top-2 right-2 flex items-center gap-1 bg-green-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full z-10"><div className="w-1.5 h-1.5 rounded-full bg-white" />OPEN</div>}
                 <div className="relative z-10 px-4 pt-16 pb-4 flex items-end gap-3">
                   <div className="w-16 h-16 rounded-xl shadow-lg border-2 border-white overflow-hidden bg-white/20 backdrop-blur-sm flex-shrink-0">
-                    {editDisp.profileUrl ? <img src={editDisp.profileUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><Leaf className="w-7 h-7 text-white/70" /></div>}
+                    {editDisp.logoUrl ? <img src={editDisp.logoUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><Leaf className="w-7 h-7 text-white/70" /></div>}
                   </div>
                   <div className="pb-0.5">
                     <p className="font-black text-base text-white drop-shadow-md" style={{ fontFamily: "'Outfit', sans-serif" }}>{editDisp.name}</p>
@@ -179,7 +226,7 @@ export default function DispensaryDashboardPage() {
             </div>
             <div>
               <label className="block text-[11px] font-medium text-gray-500 mb-2">Profile Picture <span className="text-gray-400">(Square, 400×400 recommended)</span></label>
-              <ImageUploadBox current={editDisp.profileUrl} onUpload={(url) => setEditDisp({ ...editDisp, profileUrl: url })} label="Upload Profile" aspectHint="Square" folder="profiles" className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden" />
+              <ImageUploadBox current={editDisp.logoUrl} onUpload={(url) => setEditDisp({ ...editDisp, logoUrl: url })} label="Upload Profile" aspectHint="Square" folder="profiles" className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden" />
             </div>
           </div>
 
@@ -260,7 +307,7 @@ export default function DispensaryDashboardPage() {
             )}
           </div>
 
-          <button onClick={saveStorefront} className="w-full py-3 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-700 transition-colors">Save Storefront Changes</button>
+          <button onClick={saveStorefront} disabled={savingStore} className={`w-full py-3 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-700 transition-colors ${savingStore ? "opacity-60" : ""}`}>{savingStore ? "Saving..." : "Save Storefront Changes"}</button>
         </div>
       )}
 
@@ -324,7 +371,7 @@ export default function DispensaryDashboardPage() {
             </div>
           </div>
 
-          <button onClick={saveStorefront} className="w-full py-3 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-700 transition-colors">Save Settings</button>
+          <button onClick={saveStorefront} disabled={savingStore} className={`w-full py-3 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-700 transition-colors ${savingStore ? "opacity-60" : ""}`}>{savingStore ? "Saving..." : "Save Settings"}</button>
         </div>
       )}
 

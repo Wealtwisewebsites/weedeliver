@@ -19,6 +19,7 @@ const productSchema = z.object({
   strainType: z.enum(["SATIVA", "INDICA", "HYBRID"]).nullable().optional(),
   effectSpectrum: z.number().int().min(1).max(10).nullable().optional(),
   stock: z.number().int().min(0).default(0),
+  imageUrls: z.string().optional(),
 });
 
 router.get("/:id", async (req: Request, res: Response) => {
