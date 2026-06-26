@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Leaf } from "lucide-react";
+import { Plus, Leaf, Trash2, AlertTriangle } from "lucide-react";
 import { formatZAR } from "../lib/formatters";
 import { api } from "../lib/api";
 import { EMPTY_PRODUCT, CATEGORY_LABELS, CATEGORY_ICONS, STRAIN_COLORS } from "../lib/constants";
@@ -19,12 +19,12 @@ export default function DispensaryProductsTab({ myIds, dispensaryId }) {
   const flowerCategories = ["INDOOR_FLOWER", "GREENHOUSE_FLOWER", "CONCENTRATE", "EDIBLE", "ACCESSORY", "OTHER"];
   const needsStrain = ["INDOOR_FLOWER", "GREENHOUSE_FLOWER", "CONCENTRATE"].includes(form.category);
 
-  useEffect(() => {
+  const refreshProducts = async () => {
     if (!dispensaryId) return;
-    api("GET", `/products?dispensaryId=${dispensaryId}`).then(res => {
-      if (res.ok && res.data) setProducts(res.data);
-    });
-  }, [dispensaryId]);
+    const res = await api("GET", `/products?dispensaryId=${dispensaryId}`);
+    if (res.ok && Array.isArray(res.data)) setProducts(res.data);
+  };
+  useEffect(() => { refreshProducts(); }, [dispensaryId]);
 
   const myProducts = products.filter(p => myIds.includes(p.dispensaryId));
 
@@ -36,32 +36,45 @@ export default function DispensaryProductsTab({ myIds, dispensaryId }) {
 
   const handleSave = async () => {
     if (!form.name || !form.price || !form.stock) { notify("Name, price and stock are required", "error"); return; }
+    if (saving) return;
     setSaving(true);
-    const slug = form.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    // Note: the backend generates a unique slug — we don't send one.
     const { imageUrl, ...rest } = form;
-    const payload = { ...rest, dispensaryId, slug, price: Number(form.price), stock: Number(form.stock), thcPercent: form.thcPercent ? Number(form.thcPercent) : null, cbdPercent: form.cbdPercent ? Number(form.cbdPercent) : null, strainType: needsStrain ? form.strainType : null, imageUrls: imageUrl ? JSON.stringify([imageUrl]) : "[]" };
+    const payload = { ...rest, dispensaryId, price: Number(form.price), stock: Number(form.stock), thcPercent: form.thcPercent ? Number(form.thcPercent) : null, cbdPercent: form.cbdPercent ? Number(form.cbdPercent) : null, strainType: needsStrain ? form.strainType : null, imageUrls: imageUrl ? JSON.stringify([imageUrl]) : "[]" };
 
-    if (editId) {
-      const res = await api("PUT", `/products/${editId}`, payload);
-      const updated = res.ok && res.data ? res.data : { ...payload, id: editId };
-      setProducts(prev => prev.map(p => p.id === editId ? { ...p, ...updated } : p));
-      notify("Product updated!");
-    } else {
-      const res = await api("POST", "/products", payload);
-      const created = res.ok && res.data ? res.data : { ...payload, id: `p_${Date.now()}`, imageUrls: "[]" };
-      setProducts(prev => [...prev, created]);
-      notify("Product added to your menu!");
+    const res = editId
+      ? await api("PUT", `/products/${editId}`, payload)
+      : await api("POST", "/products", payload);
+
+    if (!res.ok) {
+      notify(res.data?.error || "Couldn't save product — please try again.", "error");
+      setSaving(false);
+      return; // keep the form open so nothing is lost
     }
+
+    await refreshProducts(); // pull canonical list from the server
+    notify(editId ? "Product updated!" : "Product added to your menu!");
     setSaving(false);
     setShowForm(false);
   };
 
   const handleToggleActive = async (p) => {
     const res = await api("PUT", `/products/${p.id}`, { isActive: !p.isActive });
-    const updated = res.ok && res.data ? res.data : { ...p, isActive: !p.isActive };
-    setProducts(prev => prev.map(x => x.id === p.id ? { ...x, ...updated } : x));
-    notify(updated.isActive ? "Product is now visible to customers" : "Product hidden from menu");
+    if (!res.ok) { notify(res.data?.error || "Couldn't update product", "error"); return; }
+    setProducts(prev => prev.map(x => x.id === p.id ? { ...x, isActive: !p.isActive } : x));
+    notify(!p.isActive ? "Product is now visible to customers" : "Product hidden from menu");
   };
+
+  const handleDelete = async (p) => {
+    if (!window.confirm(`Remove "${p.name}" from your menu? This can't be undone.`)) return;
+    const res = await api("DELETE", `/products/${p.id}`);
+    if (!res.ok) { notify(res.data?.error || "Couldn't remove product", "error"); return; }
+    setProducts(prev => prev.filter(x => x.id !== p.id));
+    notify("Product removed");
+  };
+
+  const lowStock = myProducts.filter(p => p.stock > 0 && p.stock < 5).length;
+  const outOfStock = myProducts.filter(p => !p.stock || p.stock <= 0).length;
 
   const filtered = filterCat === "ALL" ? myProducts : myProducts.filter(p => p.category === filterCat);
   const cats = ["ALL", ...flowerCategories.filter(c => myProducts.some(p => p.category === c))];
@@ -71,7 +84,11 @@ export default function DispensaryProductsTab({ myIds, dispensaryId }) {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-bold">{myProducts.length} product{myProducts.length !== 1 ? "s" : ""} on your menu</p>
-          <p className="text-[11px] text-gray-400">{myProducts.filter(p => p.isActive !== false).length} active · {myProducts.filter(p => p.isActive === false).length} hidden</p>
+          <p className="text-[11px] text-gray-400">
+            {myProducts.filter(p => p.isActive !== false).length} active · {myProducts.filter(p => p.isActive === false).length} hidden
+            {lowStock > 0 && <span className="text-amber-600 font-semibold"> · {lowStock} low stock</span>}
+            {outOfStock > 0 && <span className="text-red-500 font-semibold"> · {outOfStock} out of stock</span>}
+          </p>
         </div>
         <button onClick={openAdd} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-xs font-bold shadow-md hover:shadow-lg transition-all" style={{ background: "linear-gradient(135deg, #1A7A2E, #2d9a4a)" }}>
           <Plus className="w-3.5 h-3.5" /> Add Product
@@ -127,10 +144,15 @@ export default function DispensaryProductsTab({ myIds, dispensaryId }) {
                   </div>
                 )}
                 <div className="flex items-center justify-between pt-1 border-t border-gray-100">
-                  <span className="text-[10px] text-gray-500">Stock: <span className={`font-bold ${p.stock < 5 ? "text-red-500" : "text-gray-700"}`}>{p.stock}</span></span>
-                  <div className="flex gap-1.5">
+                  <span className="text-[10px] text-gray-500">
+                    {!p.stock || p.stock <= 0
+                      ? <span className="inline-flex items-center gap-0.5 text-red-600 font-bold"><AlertTriangle className="w-3 h-3" />Out of stock</span>
+                      : <>Stock: <span className={`font-bold ${p.stock < 5 ? "text-amber-600" : "text-gray-700"}`}>{p.stock}</span></>}
+                  </span>
+                  <div className="flex gap-1">
                     <button onClick={() => handleToggleActive(p)} className={`text-[10px] px-2 py-1 rounded-lg font-semibold transition-all ${isHidden ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>{isHidden ? "Show" : "Hide"}</button>
                     <button onClick={() => openEdit(p)} className="text-[10px] px-2 py-1 rounded-lg bg-green-50 text-green-700 font-semibold hover:bg-green-100 transition-all">Edit</button>
+                    <button onClick={() => handleDelete(p)} title="Remove product" className="text-[10px] p-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
                   </div>
                 </div>
               </div>

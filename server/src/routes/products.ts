@@ -53,7 +53,11 @@ router.post("/", authenticate, requireRole("DISPENSARY"), async (req: Request, r
     const disp = await prisma.dispensary.findUnique({ where: { id: parsed.dispensaryId } });
     if (!disp || disp.userId !== req.user!.id) return res.status(403).json({ error: "Not your dispensary" });
 
-    const slug = parsed.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    // Build a slug that's unique within this dispensary (avoids the @@unique([dispensaryId, slug]) collision).
+    const baseSlug = parsed.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "product";
+    let slug = baseSlug;
+    const existing = await prisma.product.findFirst({ where: { dispensaryId: parsed.dispensaryId, slug } });
+    if (existing) slug = `${baseSlug}-${Date.now().toString(36)}`;
     const product = await prisma.product.create({ data: { ...parsed, slug, price: parsed.price, thcPercent: parsed.thcPercent, cbdPercent: parsed.cbdPercent } });
     res.status(201).json(product);
   } catch (err: any) { res.status(400).json({ error: err.message }); }
