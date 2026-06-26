@@ -3,7 +3,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Star, Clock, MapPin, Truck, Leaf, Eye, Heart, Phone, Shield, Search } from "lucide-react";
 import { CATEGORY_LABELS, DISP_COLORS } from "../lib/constants";
 import { formatZAR, timeAgo } from "../lib/formatters";
-import { DISPENSARIES, PRODUCTS } from "../lib/mockData";
 import { api } from "../lib/api";
 import { LeafIcon } from "../components/BrandLogo";
 import { ProductCard } from "../components/ProductCard";
@@ -26,11 +25,8 @@ export default function DispensaryPage() {
     api("GET", `/dispensaries/${slug}`).then(res => {
       if (res.ok && res.data) {
         setD(res.data);
-        setDispProducts(res.data.products || PRODUCTS.filter(p => p.dispensaryId === res.data.id));
+        setDispProducts(res.data.products || []);
         setReviews(res.data.reviews || []);
-      } else {
-        const mock = DISPENSARIES.find(x => x.slug === slug);
-        if (mock) { setD(mock); setDispProducts(PRODUCTS.filter(p => p.dispensaryId === mock.id)); }
       }
       setLoading(false);
     });

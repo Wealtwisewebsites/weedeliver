@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, X, MapPin, Star, Truck, Leaf } from "lucide-react";
+import { Search, X, MapPin, Star, Truck, Leaf, Store } from "lucide-react";
 import { api } from "../lib/api";
-import { DISPENSARIES } from "../lib/mockData";
 
 export default function BrowseDispensariesPage() {
   const nav = useNavigate();
@@ -15,8 +14,7 @@ export default function BrowseDispensariesPage() {
   useEffect(() => {
     setLoading(true);
     api("GET", "/dispensaries").then(res => {
-      if (res.ok && res.data?.length) setAllDisps(res.data);
-      else setAllDisps(DISPENSARIES);
+      setAllDisps(res.ok && Array.isArray(res.data) ? res.data : []);
       setLoading(false);
     });
   }, []);
@@ -40,7 +38,7 @@ export default function BrowseDispensariesPage() {
     <div className="max-w-7xl mx-auto px-3 sm:px-4 py-5 sm:py-8">
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-black text-gray-900 mb-1" style={{ fontFamily: "'Outfit', sans-serif" }}>Find Your Dispensary</h1>
-        <p className="text-gray-500 text-sm">Browse {allDisps.length} licensed cannabis stores across South Africa</p>
+        <p className="text-gray-500 text-sm">{allDisps.length > 0 ? `Browse ${allDisps.length} licensed cannabis store${allDisps.length !== 1 ? "s" : ""} across South Africa` : "Licensed cannabis stores across South Africa"}</p>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-3 sm:p-4 mb-6 space-y-3">
@@ -89,7 +87,16 @@ export default function BrowseDispensariesPage() {
         </div>
       )}
 
-      {!loading && filtered.length === 0 && (
+      {!loading && filtered.length === 0 && allDisps.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white py-16 px-6 text-center">
+          <div className="w-14 h-14 rounded-full bg-green-50 text-green-600 flex items-center justify-center mx-auto mb-4"><Store className="w-7 h-7" /></div>
+          <p className="font-black text-gray-900 text-lg" style={{ fontFamily: "'Outfit', sans-serif" }}>Dispensaries launching soon</p>
+          <p className="text-sm text-gray-500 mt-2 max-w-md mx-auto">We're onboarding verified dispensaries right now. Check back shortly — or sign up to be notified the moment they go live.</p>
+          <button onClick={() => nav("/login")} className="mt-5 px-6 py-2.5 rounded-full bg-green-700 text-white text-sm font-bold hover:bg-green-800 transition-all">Create an account</button>
+        </div>
+      )}
+
+      {!loading && filtered.length === 0 && allDisps.length > 0 && (
         <div className="text-center py-16">
           <p className="font-bold text-gray-700 mb-1">No dispensaries found</p>
           <p className="text-sm text-gray-400">Try a different search or city filter</p>
