@@ -221,19 +221,27 @@ model DeliveryTracking {
 
 // â”€â”€â”€ DRIVERS â”€â”€â”€
 model Driver {
-  id              String   @id @default(uuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   vehicleType     String?
   licenseNumber   String?
-  isOnline        Boolean  @default(false)
+  isOnline        Boolean   @default(false)
   currentLat      Decimal?
   currentLng      Decimal?
-  totalDeliveries Int      @default(0)
-  totalEarnings   Decimal  @default(0)
-  rating          Decimal  @default(5.0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  totalDeliveries Int       @default(0)
+  totalEarnings   Decimal   @default(0)
+  rating          Decimal   @default(5.0)
+  // ─── Application / approval ───
+  status          String    @default("INCOMPLETE") // INCOMPLETE | PENDING | APPROVED | DECLINED
+  applicationData String?    // JSON: photo, idNumber, documents, vehicle, quiz, bank
+  declineReason   String?
+  appliedAt       DateTime?
+  reviewedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([status])
 }
 
 // â”€â”€â”€ SUPPORT TICKETS â”€â”€â”€

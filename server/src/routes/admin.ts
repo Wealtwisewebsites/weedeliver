@@ -125,6 +125,61 @@ router.delete("/users/:id", async (req: Request, res: Response) => {
   } catch (err: any) { res.status(400).json({ error: err.message }); }
 });
 
+// ─── DRIVER APPLICATIONS ───
+
+// List all drivers + their application data (most recent first for review)
+router.get("/drivers", async (_req: Request, res: Response) => {
+  try {
+    const drivers = await prisma.driver.findMany({
+      orderBy: [{ appliedAt: "desc" }],
+      include: { user: { select: { firstName: true, lastName: true, email: true, phone: true } } },
+    });
+    const result = drivers.map(d => {
+      let app: any = {};
+      try { app = d.applicationData ? JSON.parse(d.applicationData) : {}; } catch {}
+      const { bankAccountEnc, ...safeApp } = app;
+      return {
+        id: d.id,
+        userId: d.userId,
+        status: d.status,
+        declineReason: d.declineReason,
+        appliedAt: d.appliedAt,
+        reviewedAt: d.reviewedAt,
+        totalDeliveries: d.totalDeliveries,
+        rating: d.rating,
+        firstName: d.user.firstName,
+        lastName: d.user.lastName,
+        email: d.user.email,
+        phone: d.user.phone,
+        application: safeApp,
+      };
+    });
+    res.json(result);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// Approve a driver application
+router.post("/drivers/:userId/approve", async (req: Request, res: Response) => {
+  try {
+    const driver = await prisma.driver.update({
+      where: { userId: req.params.userId },
+      data: { status: "APPROVED", reviewedAt: new Date(), declineReason: null },
+    });
+    res.json({ status: driver.status });
+  } catch (err: any) { res.status(400).json({ error: err.message }); }
+});
+
+// Decline a driver application
+router.post("/drivers/:userId/decline", async (req: Request, res: Response) => {
+  try {
+    const driver = await prisma.driver.update({
+      where: { userId: req.params.userId },
+      data: { status: "DECLINED", reviewedAt: new Date(), declineReason: req.body?.reason || "Application did not meet our requirements." },
+    });
+    res.json({ status: driver.status });
+  } catch (err: any) { res.status(400).json({ error: err.message }); }
+});
+
 // ─── PAYOUTS ───
 
 // List dispensaries with banking + earnings

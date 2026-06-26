@@ -9,6 +9,7 @@ import membershipRoutes from "./routes/memberships.js";
 import paymentRoutes from "./routes/payments.js";
 import trackingRoutes from "./routes/tracking.js";
 import adminRoutes from "./routes/admin.js";
+import driverRoutes from "./routes/drivers.js";
 
 const app = express();
 
@@ -92,6 +93,7 @@ app.use("/api/v1/memberships", membershipRoutes);
 app.use("/api/v1/payments", paymentRoutes);
 app.use("/api/v1/tracking", trackingRoutes);
 app.use("/api/v1/admin", adminRoutes);
+app.use("/api/v1/drivers", driverRoutes);
 
 // Error handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

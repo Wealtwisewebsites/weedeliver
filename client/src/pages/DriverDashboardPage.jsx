@@ -59,13 +59,16 @@ export default function DriverDashboardPage() {
 
   const submitApplication = async () => {
     setSubmitting(true);
-    await api("POST", "/drivers/apply", appData);
-    setProfile({ ...appData, status: "PENDING_REVIEW", submittedAt: new Date().toISOString() });
-    notify("Application submitted! We'll review within 2-3 business days.");
+    const res = await api("POST", "/drivers/apply", appData);
+    if (!res.ok) { notify(res.data?.error || "Couldn't submit application — please try again.", "error"); setSubmitting(false); return; }
+    const refreshed = await api("GET", "/drivers/profile");
+    if (refreshed.ok && refreshed.data) setProfile(refreshed.data);
+    else setProfile({ ...appData, status: "PENDING", submittedAt: new Date().toISOString() });
+    notify("Application submitted! Our team will review it shortly.");
     setSubmitting(false);
   };
 
-  if (!profileLoading && !profile) {
+  if (!profileLoading && (!profile || profile.status === "INCOMPLETE")) {
     const step = DRIVER_APPLICATION_STEPS[appStep];
     return (
       <div className="max-w-lg mx-auto px-3 sm:px-4 py-6">
@@ -212,12 +215,30 @@ export default function DriverDashboardPage() {
     );
   }
 
-  if (!profileLoading && profile?.status === "PENDING_REVIEW") {
+  if (!profileLoading && profile?.status === "DECLINED") {
+    return (
+      <div className="max-w-md mx-auto px-4 py-12 text-center">
+        <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4"><AlertCircle className="w-7 h-7 text-red-600" /></div>
+        <h1 className="text-xl font-black mb-2" style={{ fontFamily: "'Outfit', sans-serif" }}>Application Not Approved</h1>
+        <p className="text-gray-500 text-sm mb-4">Unfortunately your driver application wasn't approved at this time.</p>
+        {profile.declineReason && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-left mb-5">
+            <p className="text-[11px] font-semibold text-red-700 mb-0.5">Reason</p>
+            <p className="text-xs text-red-600">{profile.declineReason}</p>
+          </div>
+        )}
+        <button onClick={() => { setProfile(p => ({ ...p, status: "INCOMPLETE" })); setAppStep(0); }} className="px-6 py-2.5 rounded-full bg-green-700 text-white text-sm font-bold hover:bg-green-800 transition-all">Re-apply</button>
+        <p className="text-[11px] text-gray-400 mt-4">If you believe this is a mistake, contact support@weedeliver.co.za</p>
+      </div>
+    );
+  }
+
+  if (!profileLoading && profile?.status === "PENDING") {
     return (
       <div className="max-w-md mx-auto px-4 py-12 text-center">
         <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4"><Clock className="w-7 h-7 text-amber-600" /></div>
         <h1 className="text-xl font-black mb-2" style={{ fontFamily: "'Outfit', sans-serif" }}>Application Under Review</h1>
-        <p className="text-gray-500 text-sm mb-5">Our team is reviewing your documents and running background checks. You'll receive an email within 2-3 business days.</p>
+        <p className="text-gray-500 text-sm mb-5">Our team is reviewing your documents and running background checks. You'll be notified once a decision is made.</p>
         <div className="bg-white rounded-2xl border p-5 text-left space-y-3">
           {[{ l: "Background check", d: "Verifying ID with Home Affairs" }, { l: "Document review", d: "Checking licence & vehicle registration" }, { l: "Account activation", d: "Pending final approval" }].map((item, i) => (
             <div key={i} className="flex items-center gap-3">

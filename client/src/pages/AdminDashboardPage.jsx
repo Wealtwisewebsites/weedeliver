@@ -11,21 +11,24 @@ export default function AdminDashboardPage() {
   const [dispensaries, setLocalDisps] = useState([]);
   const [orders, setOrders] = useState([]);
   const [users, setUsers] = useState([]);
+  const [driverApps, setDriverApps] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
     setLoading(true);
-    const [dispRes, orderRes, userRes, analyticsRes] = await Promise.all([
+    const [dispRes, orderRes, userRes, analyticsRes, driverRes] = await Promise.all([
       api("GET", "/admin/dispensaries"),
       api("GET", "/admin/orders"),
       api("GET", "/admin/users"),
       api("GET", "/admin/analytics"),
+      api("GET", "/admin/drivers"),
     ]);
     if (dispRes.ok) setLocalDisps(dispRes.data || []);
     if (orderRes.ok) setOrders(orderRes.data || []);
     if (userRes.ok) setUsers(userRes.data?.users || []);
     if (analyticsRes.ok) setAnalytics(analyticsRes.data);
+    if (driverRes.ok) setDriverApps(Array.isArray(driverRes.data) ? driverRes.data : []);
     setLoading(false);
   };
 
@@ -58,7 +61,25 @@ export default function AdminDashboardPage() {
     { l: "Revenue", v: formatZAR(analytics?.totalRevenue ?? 0), ic: TrendingUp, c: "text-amber-600 bg-amber-50" },
   ];
 
-  const drivers = users.filter(u => u.role === "DRIVER");
+  const pendingDrivers = driverApps.filter(d => d.status === "PENDING");
+
+  const handleApproveDriver = async (userId) => {
+    const res = await api("POST", `/admin/drivers/${userId}/approve`);
+    if (res.ok) {
+      setDriverApps(prev => prev.map(d => d.userId === userId ? { ...d, status: "APPROVED" } : d));
+      notify("Driver approved — they can now accept deliveries.");
+    } else notify(res.data?.error || "Failed to approve driver", "error");
+  };
+
+  const handleDeclineDriver = async (userId) => {
+    const reason = window.prompt("Reason for declining this application (optional):", "") ?? "";
+    const res = await api("POST", `/admin/drivers/${userId}/decline`, { reason });
+    if (res.ok) {
+      setDriverApps(prev => prev.map(d => d.userId === userId ? { ...d, status: "DECLINED", declineReason: reason || undefined } : d));
+      notify("Driver application declined.");
+    } else notify(res.data?.error || "Failed to decline driver", "error");
+  };
+
   const pendingOrders = orders.filter(o => o.status === "PENDING" || o.status === "CONFIRMED");
   const [selectedDisp, setSelectedDisp] = useState(null);
   const PLATFORM_FEE_PCT = 0.15;
@@ -72,7 +93,7 @@ export default function AdminDashboardPage() {
     { id: "orders", l: "Orders", ic: Package, b: pendingOrders.length },
     { id: "payments", l: "Payments", ic: CreditCard, b: 0 },
     { id: "users", l: "Users", ic: Users, b: 0 },
-    { id: "drivers", l: "Drivers", ic: Truck, b: 0 },
+    { id: "drivers", l: "Drivers", ic: Truck, b: pendingDrivers.length },
   ];
 
   return (
@@ -345,39 +366,80 @@ export default function AdminDashboardPage() {
       {tab === "drivers" && (
         <div className="space-y-3">
           <div className="grid grid-cols-3 gap-2">
-            <div className="bg-white rounded-xl border p-3"><p className="text-2xl font-black text-blue-600">{drivers.length}</p><p className="text-[10px] text-gray-500">Total Drivers</p></div>
-            <div className="bg-white rounded-xl border p-3"><p className="text-2xl font-black text-green-600">{orders.filter(o => o.status === "IN_TRANSIT").length}</p><p className="text-[10px] text-gray-500">Active Deliveries</p></div>
-            <div className="bg-white rounded-xl border p-3"><p className="text-2xl font-black text-purple-600">{orders.filter(o => o.status === "DELIVERED").length}</p><p className="text-[10px] text-gray-500">Delivered</p></div>
+            <div className="bg-white rounded-xl border p-3"><p className="text-2xl font-black text-blue-600">{driverApps.length}</p><p className="text-[10px] text-gray-500">Total Drivers</p></div>
+            <div className="bg-white rounded-xl border p-3"><p className="text-2xl font-black text-amber-600">{pendingDrivers.length}</p><p className="text-[10px] text-gray-500">Pending Review</p></div>
+            <div className="bg-white rounded-xl border p-3"><p className="text-2xl font-black text-green-600">{driverApps.filter(d => d.status === "APPROVED").length}</p><p className="text-[10px] text-gray-500">Approved</p></div>
           </div>
 
+          {/* Applications awaiting review */}
+          {pendingDrivers.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="font-bold text-sm flex items-center gap-2 text-amber-700"><AlertCircle className="w-4 h-4" />{pendingDrivers.length} application{pendingDrivers.length !== 1 ? "s" : ""} awaiting review</h3>
+              {pendingDrivers.map(d => {
+                const a = d.application || {};
+                const docs = [["ID document", a.idDocument], ["Licence", a.licenceDocument], ["Vehicle reg", a.vehicleRegDocument]];
+                return (
+                  <div key={d.userId} className="bg-white rounded-xl border border-amber-200 shadow-sm p-4">
+                    <div className="flex items-start gap-3 mb-3">
+                      {a.profilePhoto ? <img src={a.profilePhoto} alt="" className="w-12 h-12 rounded-full object-cover flex-shrink-0" /> : <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"><Truck className="w-5 h-5 text-gray-400" /></div>}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-sm">{d.firstName} {d.lastName}</p>
+                        <p className="text-[11px] text-gray-400">{d.email}{d.phone ? ` · ${d.phone}` : ""}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Applied {d.appliedAt ? timeAgo(d.appliedAt) : "recently"}</p>
+                      </div>
+                      <span className="px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold flex-shrink-0">PENDING</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px] mb-3">
+                      <div className="bg-gray-50 rounded-lg p-2"><p className="text-gray-400 text-[10px]">Vehicle</p><p className="font-semibold">{[a.vehicleYear, a.vehicleMake, a.vehicleModel].filter(Boolean).join(" ") || "—"}</p></div>
+                      <div className="bg-gray-50 rounded-lg p-2"><p className="text-gray-400 text-[10px]">Reg / Type</p><p className="font-semibold">{a.vehicleReg || "—"} {a.vehicleType ? `(${a.vehicleType})` : ""}</p></div>
+                      <div className="bg-gray-50 rounded-lg p-2"><p className="text-gray-400 text-[10px]">ID Number</p><p className="font-semibold">{a.idNumber || "—"}</p></div>
+                      <div className="bg-gray-50 rounded-lg p-2"><p className="text-gray-400 text-[10px]">Bank</p><p className="font-semibold">{a.bankName || "—"}</p></div>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {docs.map(([label, url]) => url
+                        ? <a key={label} href={url} target="_blank" rel="noreferrer" className="text-[10px] px-2 py-1 rounded-lg bg-blue-50 text-blue-700 font-semibold hover:bg-blue-100">View {label}</a>
+                        : <span key={label} className="text-[10px] px-2 py-1 rounded-lg bg-gray-100 text-gray-400 font-semibold">No {label}</span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => handleApproveDriver(d.userId)} className="flex-1 py-2 rounded-lg bg-green-600 text-white text-xs font-bold flex items-center justify-center gap-1 hover:bg-green-700 transition-colors"><Check className="w-3.5 h-3.5" />Approve</button>
+                      <button onClick={() => handleDeclineDriver(d.userId)} className="flex-1 py-2 rounded-lg bg-red-100 text-red-700 text-xs font-bold flex items-center justify-center gap-1 hover:bg-red-200 transition-colors"><X className="w-3.5 h-3.5" />Decline</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* All drivers */}
           {loading ? <p className="text-center text-gray-400 py-8 text-sm">Loading...</p> :
-           drivers.length === 0 ? (
+           driverApps.length === 0 ? (
             <div className="bg-white rounded-xl border p-8 text-center">
               <Truck className="w-10 h-10 text-gray-300 mx-auto mb-2" />
               <p className="text-gray-500 text-sm font-semibold">No drivers registered yet</p>
-              <p className="text-[11px] text-gray-400 mt-1">Drivers sign up with the DRIVER role and appear here</p>
+              <p className="text-[11px] text-gray-400 mt-1">Drivers sign up with the DRIVER role and apply here</p>
             </div>
           ) : (
             <div className="bg-white rounded-xl border overflow-hidden">
-              <div className="px-4 py-3 border-b bg-gray-50"><p className="text-xs font-semibold text-gray-600">{drivers.length} registered drivers</p></div>
+              <div className="px-4 py-3 border-b bg-gray-50"><p className="text-xs font-semibold text-gray-600">All drivers ({driverApps.length})</p></div>
               <div className="divide-y">
-                {drivers.map(driver => {
-                  const driverOrders = orders.filter(o => o.driverId === driver.id);
-                  const activeOrder = driverOrders.find(o => o.status === "IN_TRANSIT");
+                {driverApps.map(d => {
+                  const a = d.application || {};
+                  const driverOrders = orders.filter(o => o.driverId === d.userId);
+                  const activeOrder = driverOrders.find(o => o.status === "IN_TRANSIT" || o.status === "DRIVER_ASSIGNED");
                   const delivered = driverOrders.filter(o => o.status === "DELIVERED").length;
+                  const statusStyle = { APPROVED: "bg-green-100 text-green-700", PENDING: "bg-amber-100 text-amber-700", DECLINED: "bg-red-100 text-red-700", INCOMPLETE: "bg-gray-100 text-gray-500" }[d.status] || "bg-gray-100 text-gray-500";
                   return (
-                    <div key={driver.id} className="p-4 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0"><Truck className="w-4 h-4 text-blue-600" /></div>
-                        <div><p className="font-bold text-sm">{driver.firstName} {driver.lastName}</p><p className="text-[11px] text-gray-400">{driver.email}</p></div>
+                    <div key={d.userId} className="p-4 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {a.profilePhoto ? <img src={a.profilePhoto} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" /> : <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0"><Truck className="w-4 h-4 text-blue-600" /></div>}
+                        <div className="min-w-0"><p className="font-bold text-sm truncate">{d.firstName} {d.lastName}</p><p className="text-[11px] text-gray-400 truncate">{d.email}</p></div>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        {activeOrder ? (
-                          <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-bold">ON DELIVERY</span>
-                        ) : (
-                          <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-500 text-[10px] font-bold">AVAILABLE</span>
-                        )}
-                        <p className="text-[10px] text-gray-400 mt-1">{delivered} delivered</p>
+                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${statusStyle}`}>{d.status}</span>
+                        <p className="text-[10px] text-gray-400 mt-1">{activeOrder ? "On delivery" : `${delivered} delivered`}</p>
+                        {d.status === "DECLINED" && <button onClick={() => handleApproveDriver(d.userId)} className="text-[10px] text-green-600 font-semibold mt-1 hover:underline">Approve</button>}
+                        {d.status === "APPROVED" && <button onClick={() => handleDeclineDriver(d.userId)} className="text-[10px] text-red-500 font-semibold mt-1 hover:underline">Revoke</button>}
                       </div>
                     </div>
                   );

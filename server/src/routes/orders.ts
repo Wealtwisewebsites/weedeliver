@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { authenticate } from "../middleware/auth.js";
 import { requireRole, requireAge } from "../middleware/guards.js";
 import * as orderService from "../services/orderService.js";
+import prisma from "../prisma.js";
 
 const router = Router();
 
@@ -83,6 +84,11 @@ router.put("/:id/status", authenticate, async (req: Request, res: Response) => {
 // Accept delivery (driver)
 router.post("/:id/accept-delivery", authenticate, requireRole("DRIVER"), async (req: Request, res: Response) => {
   try {
+    // Only approved drivers may accept deliveries.
+    const driver = await prisma.driver.findUnique({ where: { userId: req.user!.id } });
+    if (!driver || driver.status !== "APPROVED") {
+      return res.status(403).json({ error: "Your driver application must be approved before you can accept deliveries." });
+    }
     const order = await orderService.updateOrderStatus(req.params.id, "DRIVER_ASSIGNED", req.user!.id, "DRIVER");
     const io = req.app.get("io");
     if (io) {
