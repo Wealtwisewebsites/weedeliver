@@ -22,6 +22,19 @@ const productSchema = z.object({
   imageUrls: z.string().optional(),
 });
 
+// List products for a dispensary (owner dashboard — includes inactive/hidden).
+router.get("/", async (req: Request, res: Response) => {
+  try {
+    const { dispensaryId } = req.query;
+    if (!dispensaryId) return res.status(400).json({ error: "dispensaryId required" });
+    const products = await prisma.product.findMany({
+      where: { dispensaryId: dispensaryId as string },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json(products);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 router.get("/:id", async (req: Request, res: Response) => {
   try {
     const product = await prisma.product.findUnique({
