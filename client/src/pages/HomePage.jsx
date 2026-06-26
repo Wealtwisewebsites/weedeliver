@@ -21,14 +21,14 @@ const IMG = {
   cta: "photo-1530028828-25e8270793c5",
 };
 
-// Gallery tiles — verified-loading botanical imagery, framed with brand overlays + captions.
+// Gallery tiles — local product imagery, framed with brand overlays + captions.
 const GALLERY = [
-  { id: "photo-1603909223429-69bb7101f420", label: "Premium Flower", span: "col-span-2 row-span-2" },
-  { id: "photo-1556928045-16f7f50be0f3", label: "Edibles", span: "" },
-  { id: "photo-1605000797499-95a51c5269ae", label: "Concentrates", span: "" },
-  { id: "photo-1490750967868-88aa4486c946", label: "Wellness & CBD", span: "col-span-2" },
-  { id: "photo-1599819811279-d5ad9cccf838", label: "Pre-Rolls", span: "" },
-  { id: "photo-1518531933037-91b2f5f229cc", label: "Accessories", span: "" },
+  { src: "/gallery/premium-flower.jpg", label: "Premium Flower", span: "col-span-2 row-span-2" },
+  { src: "/gallery/edibles.jpg", label: "Edibles", span: "" },
+  { src: "/gallery/concentrates.jpg", label: "Concentrates", span: "" },
+  { src: "/gallery/wellness-cbd.jpg", label: "Wellness & CBD", span: "col-span-2" },
+  { src: "/gallery/pre-rolls.jpg", label: "Pre-Rolls", span: "" },
+  { src: "/gallery/accessories.jpg", label: "Accessories", span: "" },
 ];
 
 // Background photo with a guaranteed gradient fallback — never shows a broken image.
@@ -43,12 +43,12 @@ function Bg({ id, overlay, className = "" }) {
 }
 
 // Gallery tile — image with brand overlay (lightens on hover), caption, and gradient fallback.
-function GalleryTile({ id, label, span }) {
+function GalleryTile({ src, label, span }) {
   const [failed, setFailed] = useState(false);
   return (
     <div className={`group relative overflow-hidden rounded-2xl ${span}`}>
       {!failed
-        ? <img src={ux(id, 700)} alt={label} loading="lazy" onError={() => setFailed(true)} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+        ? <img src={src} alt={label} loading="lazy" onError={() => setFailed(true)} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
         : <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #1A7A2E, #0a2e12)" }} />}
       <div className="absolute inset-0 transition-opacity duration-500 group-hover:opacity-60" style={{ background: "linear-gradient(to top, rgba(6,34,13,0.88) 0%, rgba(6,34,13,0.25) 55%, rgba(26,122,46,0.35) 100%)" }} />
       <LeafIcon className="absolute top-3 right-3 w-5 h-5 text-white/50" />
@@ -316,7 +316,7 @@ export default function HomePage() {
           </Reveal>
           <Reveal delay={120}>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4" style={{ gridAutoRows: "150px" }}>
-              {GALLERY.map(g => <GalleryTile key={g.label} id={g.id} label={g.label} span={g.span} />)}
+              {GALLERY.map(g => <GalleryTile key={g.label} src={g.src} label={g.label} span={g.span} />)}
             </div>
           </Reveal>
         </div>
