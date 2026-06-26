@@ -103,7 +103,11 @@ router.post("/initiate", authenticate, async (req: Request, res: Response) => {
     });
 
     const checkoutData: Record<string, unknown> = { paymentId: payment.id, provider };
-    const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+    // Guard against a malformed CLIENT_URL env (e.g. extra text/whitespace) breaking provider return URLs.
+    const rawClientUrl = (process.env.CLIENT_URL || "").trim();
+    const isValidUrl = /^https?:\/\/[^\s/]+(\/[^\s]*)?$/.test(rawClientUrl);
+    const fallbackUrl = process.env.NODE_ENV === "production" ? "https://weedeliver-full.vercel.app" : "http://localhost:5173";
+    const clientUrl = (isValidUrl ? rawClientUrl : fallbackUrl).replace(/\/+$/, "");
 
     if (provider === "YOCO") {
       if (!YOCO_SECRET) return res.status(500).json({ error: "Payment provider not configured" });
