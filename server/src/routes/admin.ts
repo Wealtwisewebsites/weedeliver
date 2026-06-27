@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import prisma from "../prisma.js";
 import { authenticate } from "../middleware/auth.js";
 import { requireRole } from "../middleware/guards.js";
+import { notifyApproved } from "../services/notifications.js";
 
 const router = Router();
 
@@ -164,7 +165,9 @@ router.post("/drivers/:userId/approve", async (req: Request, res: Response) => {
     const driver = await prisma.driver.update({
       where: { userId: req.params.userId },
       data: { status: "APPROVED", reviewedAt: new Date(), declineReason: null },
+      include: { user: { select: { email: true, firstName: true } } },
     });
+    void notifyApproved(driver.user.email, driver.user.firstName, "driver");
     res.json({ status: driver.status });
   } catch (err: any) { res.status(400).json({ error: err.message }); }
 });

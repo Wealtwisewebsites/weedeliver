@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import * as authService from "../services/authService.js";
 import { authenticate } from "../middleware/auth.js";
 import prisma from "../prisma.js";
+import { notifyCustomerWelcome } from "../services/notifications.js";
 
 const router = Router();
 
@@ -9,6 +10,8 @@ router.post("/register", async (req: Request, res: Response) => {
   try {
     const result = await authService.register(req.body);
     res.cookie("refreshToken", result.refreshToken, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", maxAge: 7 * 24 * 60 * 60 * 1000 });
+    // Customers get a welcome email on signup; dispensaries/drivers are emailed when they apply.
+    if (result.user.role === "CUSTOMER") void notifyCustomerWelcome(result.user.email, result.user.firstName);
     res.status(201).json({ user: result.user, accessToken: result.accessToken });
   } catch (err: any) {
     res.status(400).json({ error: err.message });

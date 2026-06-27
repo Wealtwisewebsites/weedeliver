@@ -5,6 +5,7 @@ import { requireRole, requireOwner } from "../middleware/guards.js";
 import { upload } from "../middleware/upload.js";
 import { z } from "zod";
 import { isDispensaryOpen, haversineDistance, encrypt, maskAccountNumber } from "../utils.js";
+import { notifyApplicationReceived, notifyApproved, notifyAdminNewApplication } from "../services/notifications.js";
 
 const router = Router();
 
@@ -126,6 +127,10 @@ router.post("/", authenticate, requireRole("DISPENSARY"), async (req: Request, r
         isActive: true,
       },
     });
+    // Notify the owner (application received) and the admin (new application to review).
+    const owner = req.user!;
+    void notifyApplicationReceived(owner.email, owner.firstName, "dispensary");
+    void notifyAdminNewApplication("dispensary", dispensary.name, owner.email, `${dispensary.city}, ${dispensary.province}`);
     res.status(201).json(dispensary);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -197,7 +202,12 @@ router.post("/:id/logo", authenticate, requireOwner, upload.single("image"), asy
 // ─── ADMIN APPROVE ───
 router.post("/:id/approve", authenticate, requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
-    const dispensary = await prisma.dispensary.update({ where: { id: req.params.id }, data: { isApproved: true } });
+    const dispensary = await prisma.dispensary.update({
+      where: { id: req.params.id },
+      data: { isApproved: true },
+      include: { user: { select: { email: true, firstName: true } } },
+    });
+    void notifyApproved(dispensary.user.email, dispensary.user.firstName, "dispensary");
     res.json(dispensary);
   } catch (err: any) {
     res.status(400).json({ error: err.message });

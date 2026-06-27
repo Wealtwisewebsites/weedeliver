@@ -3,6 +3,7 @@ import prisma from "../prisma.js";
 import { authenticate } from "../middleware/auth.js";
 import { requireRole } from "../middleware/guards.js";
 import { encrypt } from "../utils.js";
+import { notifyApplicationReceived, notifyAdminNewApplication } from "../services/notifications.js";
 
 const router = Router();
 
@@ -49,6 +50,9 @@ router.post("/apply", authenticate, requireRole("DRIVER"), async (req: Request, 
         applicationData: JSON.stringify(data),
       },
     });
+    const u = req.user!;
+    void notifyApplicationReceived(u.email, u.firstName, "driver");
+    void notifyAdminNewApplication("driver", `${u.firstName} ${u.lastName}`, u.email, data.vehicleMake ? `Vehicle: ${[data.vehicleYear, data.vehicleMake, data.vehicleModel].filter(Boolean).join(" ")}` : "");
     res.json({ status: driver.status, appliedAt: driver.appliedAt });
   } catch (err: any) { res.status(400).json({ error: err.message }); }
 });

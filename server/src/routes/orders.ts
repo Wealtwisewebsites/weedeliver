@@ -3,6 +3,7 @@ import { authenticate } from "../middleware/auth.js";
 import { requireRole, requireAge } from "../middleware/guards.js";
 import * as orderService from "../services/orderService.js";
 import prisma from "../prisma.js";
+import { notifyOrderCustomer, notifyOrderDispensary } from "../services/notifications.js";
 
 const router = Router();
 
@@ -16,6 +17,18 @@ router.post("/", authenticate, requireRole("CUSTOMER"), requireAge, async (req: 
       io.to(`dispensary:${order.dispensaryId}`).emit("new_order", order);
       io.to("admin").emit("new_order", order);
     }
+    // Email the customer (confirmation) and the dispensary owner (new order to fulfil).
+    const customer = req.user!;
+    const emailOrder = {
+      id: order.id,
+      total: Number(order.total),
+      deliveryAddress: order.deliveryAddress,
+      items: order.items.map((i: any) => ({ productName: i.productName, quantity: i.quantity })),
+    };
+    void notifyOrderCustomer(customer.email, customer.firstName, order.dispensary?.name || "the dispensary", emailOrder);
+    prisma.dispensary.findUnique({ where: { id: order.dispensaryId }, select: { name: true, user: { select: { email: true } } } })
+      .then(d => { if (d?.user?.email) void notifyOrderDispensary(d.user.email, d.name, `${customer.firstName} ${customer.lastName}`, emailOrder); })
+      .catch(() => {});
     res.status(201).json(order);
   } catch (err: any) {
     const status = err.code === "MEMBERSHIP_REQUIRED" ? 403 : 400;
