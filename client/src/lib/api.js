@@ -9,7 +9,8 @@ const authHeaders = () => {
 
 const refreshToken = async () => {
   try {
-    const res = await fetch(`${API}/auth/refresh`, { method: "POST", headers: authHeaders() });
+    // credentials:"include" is required to send the httpOnly refresh cookie cross-origin (Vercel ↔ Render).
+    const res = await fetch(`${API}/auth/refresh`, { method: "POST", headers: authHeaders(), credentials: "include" });
     const data = await res.json();
     if (data?.accessToken) { localStorage.setItem("wd_token", data.accessToken); return true; }
   } catch {}
@@ -19,7 +20,7 @@ const refreshToken = async () => {
 
 export const api = async (method, path, body) => {
   try {
-    const opts = { method, headers: authHeaders() };
+    const opts = { method, headers: authHeaders(), credentials: "include" };
     if (body) opts.body = JSON.stringify(body);
     const res = await fetch(`${API}${path}`, opts);
     const data = await res.json().catch(() => null);

@@ -82,6 +82,7 @@ export default function AdminDashboardPage() {
 
   const pendingOrders = orders.filter(o => o.status === "PENDING" || o.status === "CONFIRMED");
   const [selectedDisp, setSelectedDisp] = useState(null);
+  const [selectedDriver, setSelectedDriver] = useState(null);
   const PLATFORM_FEE_PCT = 0.15;
   const deliveredOrders = orders.filter(o => o.status === "DELIVERED");
   const totalRevenue = deliveredOrders.reduce((s, o) => s + Number(o.total || 0), 0);
@@ -430,16 +431,16 @@ export default function AdminDashboardPage() {
                   const delivered = driverOrders.filter(o => o.status === "DELIVERED").length;
                   const statusStyle = { APPROVED: "bg-green-100 text-green-700", PENDING: "bg-amber-100 text-amber-700", DECLINED: "bg-red-100 text-red-700", INCOMPLETE: "bg-gray-100 text-gray-500" }[d.status] || "bg-gray-100 text-gray-500";
                   return (
-                    <div key={d.userId} className="p-4 flex items-center justify-between gap-3">
+                    <div key={d.userId} onClick={() => setSelectedDriver(d)} className="p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-gray-50 transition-colors">
                       <div className="flex items-center gap-3 min-w-0">
                         {a.profilePhoto ? <img src={a.profilePhoto} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" /> : <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0"><Truck className="w-4 h-4 text-blue-600" /></div>}
-                        <div className="min-w-0"><p className="font-bold text-sm truncate">{d.firstName} {d.lastName}</p><p className="text-[11px] text-gray-400 truncate">{d.email}</p></div>
+                        <div className="min-w-0"><p className="font-bold text-sm truncate hover:text-green-700">{d.firstName} {d.lastName}</p><p className="text-[11px] text-gray-400 truncate">{d.email}</p></div>
                       </div>
                       <div className="text-right flex-shrink-0">
                         <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${statusStyle}`}>{d.status}</span>
                         <p className="text-[10px] text-gray-400 mt-1">{activeOrder ? "On delivery" : `${delivered} delivered`}</p>
-                        {d.status === "DECLINED" && <button onClick={() => handleApproveDriver(d.userId)} className="text-[10px] text-green-600 font-semibold mt-1 hover:underline">Approve</button>}
-                        {d.status === "APPROVED" && <button onClick={() => handleDeclineDriver(d.userId)} className="text-[10px] text-red-500 font-semibold mt-1 hover:underline">Revoke</button>}
+                        {d.status === "DECLINED" && <button onClick={(e) => { e.stopPropagation(); handleApproveDriver(d.userId); }} className="text-[10px] text-green-600 font-semibold mt-1 hover:underline">Approve</button>}
+                        {d.status === "APPROVED" && <button onClick={(e) => { e.stopPropagation(); handleDeclineDriver(d.userId); }} className="text-[10px] text-red-500 font-semibold mt-1 hover:underline">Revoke</button>}
                       </div>
                     </div>
                   );
@@ -615,6 +616,52 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       )}
+
+      {selectedDriver && (() => {
+        const a = selectedDriver.application || {};
+        const docs = [["ID Document", a.idDocument], ["Driver's Licence", a.licenceDocument], ["Vehicle Registration", a.vehicleRegDocument]];
+        const sStyle = { APPROVED: "bg-green-100 text-green-700", PENDING: "bg-amber-100 text-amber-700", DECLINED: "bg-red-100 text-red-700", INCOMPLETE: "bg-gray-100 text-gray-500" }[selectedDriver.status] || "bg-gray-100 text-gray-500";
+        return (
+          <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setSelectedDriver(null)}>
+            <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="sticky top-0 bg-white border-b px-5 py-4 flex items-center justify-between z-10">
+                <div className="flex items-center gap-3 min-w-0">
+                  {a.profilePhoto ? <img src={a.profilePhoto} alt="" className="w-10 h-10 rounded-full object-cover" /> : <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center"><Truck className="w-5 h-5 text-blue-600" /></div>}
+                  <div className="min-w-0"><h2 className="font-black text-base truncate" style={{ fontFamily: "'Outfit', sans-serif" }}>{selectedDriver.firstName} {selectedDriver.lastName}</h2><p className="text-[11px] text-gray-400 truncate">{selectedDriver.email}</p></div>
+                </div>
+                <span className={`px-2 py-1 rounded-full text-[10px] font-bold flex-shrink-0 ${sStyle}`}>{selectedDriver.status}</span>
+              </div>
+              <div className="p-5 space-y-4">
+                {selectedDriver.status === "INCOMPLETE" && <div className="bg-gray-50 rounded-xl p-3 text-center text-xs text-gray-500">This driver registered but hasn't submitted their application yet.</div>}
+                {selectedDriver.declineReason && <div className="bg-red-50 border border-red-200 rounded-xl p-3"><p className="text-[11px] font-semibold text-red-700">Decline reason</p><p className="text-xs text-red-600">{selectedDriver.declineReason}</p></div>}
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <div className="bg-gray-50 rounded-lg p-2.5"><p className="text-gray-400 text-[10px]">Phone</p><p className="font-semibold">{selectedDriver.phone || "—"}</p></div>
+                  <div className="bg-gray-50 rounded-lg p-2.5"><p className="text-gray-400 text-[10px]">Applied</p><p className="font-semibold">{selectedDriver.appliedAt ? timeAgo(selectedDriver.appliedAt) : "—"}</p></div>
+                  <div className="bg-gray-50 rounded-lg p-2.5"><p className="text-gray-400 text-[10px]">ID Number</p><p className="font-semibold">{a.idNumber || "—"}</p></div>
+                  <div className="bg-gray-50 rounded-lg p-2.5"><p className="text-gray-400 text-[10px]">Deliveries</p><p className="font-semibold">{selectedDriver.totalDeliveries ?? 0}</p></div>
+                  <div className="bg-gray-50 rounded-lg p-2.5"><p className="text-gray-400 text-[10px]">Vehicle</p><p className="font-semibold">{[a.vehicleYear, a.vehicleMake, a.vehicleModel].filter(Boolean).join(" ") || "—"}</p></div>
+                  <div className="bg-gray-50 rounded-lg p-2.5"><p className="text-gray-400 text-[10px]">Reg / Type</p><p className="font-semibold">{a.vehicleReg || "—"} {a.vehicleType ? `(${a.vehicleType})` : ""}</p></div>
+                  <div className="bg-gray-50 rounded-lg p-2.5 col-span-2"><p className="text-gray-400 text-[10px]">Bank</p><p className="font-semibold">{a.bankName || "—"}</p></div>
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-500 mb-1.5">Documents</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {docs.map(([label, url]) => url
+                      ? <a key={label} href={url} target="_blank" rel="noreferrer" className="text-[10px] px-2 py-1 rounded-lg bg-blue-50 text-blue-700 font-semibold hover:bg-blue-100">View {label}</a>
+                      : <span key={label} className="text-[10px] px-2 py-1 rounded-lg bg-gray-100 text-gray-400 font-semibold">No {label}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-1">
+                  {selectedDriver.status !== "APPROVED" && <button onClick={() => { handleApproveDriver(selectedDriver.userId); setSelectedDriver(null); }} className="flex-1 py-2.5 rounded-xl bg-green-600 text-white font-bold text-sm flex items-center justify-center gap-1.5 hover:bg-green-700"><Check className="w-4 h-4" />Approve</button>}
+                  {selectedDriver.status !== "DECLINED" && <button onClick={() => { handleDeclineDriver(selectedDriver.userId); setSelectedDriver(null); }} className="flex-1 py-2.5 rounded-xl bg-red-100 text-red-700 font-bold text-sm flex items-center justify-center gap-1.5 hover:bg-red-200"><X className="w-4 h-4" />Decline</button>}
+                  <button onClick={() => setSelectedDriver(null)} className="px-4 py-2.5 rounded-xl border text-sm font-semibold text-gray-600 hover:bg-gray-50">Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

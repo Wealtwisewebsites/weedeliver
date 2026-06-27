@@ -8,7 +8,7 @@ const router = Router();
 router.post("/register", async (req: Request, res: Response) => {
   try {
     const result = await authService.register(req.body);
-    res.cookie("refreshToken", result.refreshToken, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie("refreshToken", result.refreshToken, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", maxAge: 7 * 24 * 60 * 60 * 1000 });
     res.status(201).json({ user: result.user, accessToken: result.accessToken });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -18,7 +18,7 @@ router.post("/register", async (req: Request, res: Response) => {
 router.post("/login", async (req: Request, res: Response) => {
   try {
     const result = await authService.login(req.body);
-    res.cookie("refreshToken", result.refreshToken, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie("refreshToken", result.refreshToken, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", maxAge: 7 * 24 * 60 * 60 * 1000 });
     res.json({ user: result.user, accessToken: result.accessToken });
   } catch (err: any) {
     res.status(401).json({ error: err.message });
@@ -35,7 +35,7 @@ router.post("/refresh", async (req: Request, res: Response) => {
     const token = req.cookies?.refreshToken;
     if (!token) return res.status(401).json({ error: "No refresh token" });
     const tokens = await authService.refreshAccessToken(token);
-    res.cookie("refreshToken", tokens.refreshToken, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie("refreshToken", tokens.refreshToken, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", maxAge: 7 * 24 * 60 * 60 * 1000 });
     res.json({ accessToken: tokens.accessToken });
   } catch (err: any) {
     res.status(401).json({ error: err.message });

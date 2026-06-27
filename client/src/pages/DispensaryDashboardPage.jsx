@@ -67,8 +67,8 @@ export default function DispensaryDashboardPage() {
     const res = await api("POST", "/dispensaries", payload);
     if (res.ok && res.data) {
       setMyDisps([res.data]);
-      setEditDisp({ ...res.data });
-      notify("Dispensary live! Customers can find you now.");
+      setEditDisp(hydrateDisp(res.data));
+      notify("Application submitted! Set up your store while our team reviews it.");
       setTab("storefront");
     } else {
       notify("Failed to create dispensary", "error");
@@ -153,7 +153,7 @@ export default function DispensaryDashboardPage() {
             <div><label className="block text-[11px] font-medium text-gray-500 mb-1">Radius (km)</label><input type="number" value={newDisp.deliveryRadius} onChange={e => setNewDisp({ ...newDisp, deliveryRadius: Number(e.target.value) })} className="w-full px-3 py-2 rounded-xl border text-sm outline-none" /></div>
           </div>
           <button onClick={handleCreateDispensary} disabled={creating || !newDisp.name || !newDisp.city} className={`w-full py-3 rounded-xl text-white font-bold text-sm shadow-lg transition ${creating ? "opacity-60" : "hover:shadow-xl"}`} style={{ background: "linear-gradient(135deg, #1A7A2E, #2d9a4a)" }}>{creating ? "Creating..." : "Create My Dispensary"}</button>
-          <p className="text-[10px] text-gray-400 text-center">Your store goes live immediately and is visible to all customers.</p>
+          <p className="text-[10px] text-gray-400 text-center">Your application is reviewed by our team before your store goes live to customers.</p>
         </div>
       </div>
     );
@@ -163,6 +163,15 @@ export default function DispensaryDashboardPage() {
     <div className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-5">
       <h1 className="text-lg sm:text-xl font-black mb-1" style={{ fontFamily: "'Outfit', sans-serif" }}>Dispensary Dashboard</h1>
       <p className="text-gray-500 text-xs mb-4">Manage orders & products</p>
+      {myDisps[0] && !myDisps[0].isApproved && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 flex items-start gap-2">
+          <Clock className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-bold text-amber-800">Application under review</p>
+            <p className="text-[11px] text-amber-700">Your store isn't visible to customers yet. Set up your storefront and products now — once an admin approves your application, you'll start receiving orders.</p>
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mb-3 sm:mb-4">
         <div className="rounded-xl p-3 text-center bg-amber-50 text-amber-700"><p className="text-xl font-black">{pending.length}</p><p className="text-[10px] font-medium">Pending</p></div>
         <div className="rounded-xl p-3 text-center bg-blue-50 text-blue-700"><p className="text-xl font-black">{active.length}</p><p className="text-[10px] font-medium">Active</p></div>

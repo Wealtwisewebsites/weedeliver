@@ -122,7 +122,7 @@ router.post("/", authenticate, requireRole("DISPENSARY"), async (req: Request, r
         ...parsed,
         slug,
         userId: req.user!.id,
-        isApproved: true,
+        isApproved: false, // pending admin review before the store goes live
         isActive: true,
       },
     });
