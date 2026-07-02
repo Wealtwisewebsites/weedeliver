@@ -27,6 +27,8 @@ const stripSlash = (s: string) => s.replace(/\/+$/, "");
 const allowedOrigins = [
   process.env.CLIENT_URL,
   "https://weedeliver-full.vercel.app",
+  "https://weedeliver.online",
+  "https://www.weedeliver.online",
   "http://localhost:5173",
   "http://localhost:3000",
 ]
@@ -39,6 +41,8 @@ app.use(cors({
     const normalized = stripSlash(origin);
     const allowed =
       allowedOrigins.includes(normalized) ||
+      // Allow the custom domain and any of its subdomains
+      /^https:\/\/([a-z0-9-]+\.)?weedeliver\.online$/.test(normalized) ||
       // Allow this project's Vercel preview deployments
       /^https:\/\/weedeliver-full-[a-z0-9-]+\.vercel\.app$/.test(normalized);
     if (allowed || process.env.NODE_ENV !== "production") return cb(null, true);
