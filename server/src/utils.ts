@@ -21,6 +21,7 @@ export function isDispensaryOpen(
     try { operatingHours = JSON.parse(operatingHours); } catch { return true; }
   }
   if (typeof operatingHours !== "object") return true;
+  if (Object.keys(operatingHours).length === 0) return true; // no hours configured → open
 
   const now = new Date();
   // Get current time in SA timezone
@@ -45,7 +46,8 @@ export function isDispensaryOpen(
   if (!dayKey) return true;
 
   const todayHours = operatingHours[dayKey];
-  if (!todayHours || todayHours.isOpen === false) return false;
+  if (!todayHours) return true;                       // this day not configured → open
+  if (todayHours.isOpen === false) return false;      // explicitly marked closed
 
   const currentMinutes = parseInt(hourPart) * 60 + parseInt(minutePart);
   const [openH, openM] = (todayHours.open || "00:00").split(":").map(Number);

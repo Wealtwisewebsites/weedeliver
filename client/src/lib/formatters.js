@@ -5,14 +5,17 @@ export const timeAgo = (d) => { const m = Math.floor((Date.now() - new Date(d).g
 
 export const isDispensaryOpen = (hours) => {
   if (!hours) return true;
+  if (typeof hours === "string") { try { hours = JSON.parse(hours); } catch { return true; } }
+  if (typeof hours !== "object" || Object.keys(hours).length === 0) return true; // no hours set → open
   const dayMap = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
   const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Johannesburg" }));
   const dayKey = dayMap[now.getDay()];
   const dayHours = hours[dayKey];
-  if (!dayHours || !dayHours.isOpen) return false;
+  if (!dayHours) return true;                    // day not configured → open
+  if (dayHours.isOpen === false) return false;   // explicitly closed
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  const [openH, openM] = dayHours.open.split(":").map(Number);
-  const [closeH, closeM] = dayHours.close.split(":").map(Number);
+  const [openH, openM] = (dayHours.open || "00:00").split(":").map(Number);
+  const [closeH, closeM] = (dayHours.close || "23:59").split(":").map(Number);
   const openMinutes = openH * 60 + openM;
   const closeMinutes = closeH * 60 + closeM;
   if (closeMinutes < openMinutes) {

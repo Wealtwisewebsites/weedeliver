@@ -3,7 +3,7 @@ import { Package, Leaf, Store, Edit, Clock, Check, CheckCircle, MapPin, Truck, C
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { formatZAR, timeAgo, isDispensaryOpen } from "../lib/formatters";
 import { api } from "../lib/api";
-import { DAY_KEYS, DAY_LABELS, SA_BANKS, CATEGORY_ICONS, STRAIN_COLORS } from "../lib/constants";
+import { DAY_KEYS, DAY_LABELS, SA_BANKS, CATEGORY_ICONS, STRAIN_COLORS, DEFAULT_HOURS } from "../lib/constants";
 import { StatusBadge } from "../components/StatusBadge";
 import ImageUploadBox from "../components/ImageUploadBox";
 import DispensaryProductsTab from "./DispensaryProductsTab";
@@ -16,11 +16,15 @@ const safeParse = (val, fallback) => {
   if (typeof val === "string") { try { return JSON.parse(val); } catch { return fallback; } }
   return fallback;
 };
-const hydrateDisp = (d) => ({
-  ...d,
-  operatingHours: safeParse(d.operatingHours, {}),
-  socialLinks: safeParse(d.socialLinks, {}),
-});
+const hydrateDisp = (d) => {
+  const oh = safeParse(d.operatingHours, {});
+  return {
+    ...d,
+    // Ensure a full 7-day schedule so saving always writes complete hours (missing days would read as "closed").
+    operatingHours: oh && Object.keys(oh).length ? oh : { ...DEFAULT_HOURS },
+    socialLinks: safeParse(d.socialLinks, {}),
+  };
+};
 
 export default function DispensaryDashboardPage() {
   const { currentUser } = useAuth();
@@ -234,7 +238,7 @@ export default function DispensaryDashboardPage() {
               <div className="relative overflow-hidden bg-gray-200">
                 {editDisp.bannerUrl ? <img src={editDisp.bannerUrl} alt="" className="absolute inset-0 w-full h-full object-cover" /> : <div className="absolute inset-0 bg-gray-100" />}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-black/5" />
-                {editDisp.openNow && <div className="absolute top-2 right-2 flex items-center gap-1 bg-green-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full z-10"><div className="w-1.5 h-1.5 rounded-full bg-white" />OPEN</div>}
+                {isDispensaryOpen(editDisp.operatingHours) && <div className="absolute top-2 right-2 flex items-center gap-1 bg-green-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full z-10"><div className="w-1.5 h-1.5 rounded-full bg-white" />OPEN</div>}
                 <div className="relative z-10 px-4 pt-16 pb-4 flex items-end gap-3">
                   <div className="w-16 h-16 rounded-xl shadow-lg border-2 border-white overflow-hidden bg-white/20 backdrop-blur-sm flex-shrink-0">
                     {editDisp.logoUrl ? <img src={editDisp.logoUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><Leaf className="w-7 h-7 text-white/70" /></div>}
@@ -280,7 +284,11 @@ export default function DispensaryDashboardPage() {
               <div><label className="block text-[11px] font-medium text-gray-500 mb-1">Min Order (R)</label><input type="number" value={editDisp.minimumOrder} onChange={e => setEditDisp({ ...editDisp, minimumOrder: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-green-500 outline-none" /></div>
             </div>
             <div><label className="block text-[11px] font-medium text-gray-500 mb-1">Delivery Radius: {editDisp.deliveryRadius} km</label><input type="range" min={1} max={50} value={editDisp.deliveryRadius} onChange={e => setEditDisp({ ...editDisp, deliveryRadius: Number(e.target.value) })} className="w-full accent-green-600" /></div>
-            <div className="flex items-center justify-between"><span className="text-sm font-medium">Currently Open</span><button onClick={() => setEditDisp({ ...editDisp, openNow: !editDisp.openNow })} className={`w-12 h-6 rounded-full transition-all flex items-center ${editDisp.openNow ? "bg-green-500 justify-end" : "bg-gray-300 justify-start"}`}><div className="w-5 h-5 bg-white rounded-full shadow-sm mx-0.5" /></button></div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Store status right now</span>
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${isDispensaryOpen(editDisp.operatingHours) ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>{isDispensaryOpen(editDisp.operatingHours) ? "OPEN" : "CLOSED"}</span>
+            </div>
+            <p className="text-[10px] text-gray-400 -mt-1">Your store opens & closes automatically based on the Trading Hours below. To close temporarily, turn a day off in Trading Hours.</p>
           </div>
 
           <div className="bg-white rounded-xl p-4 border space-y-3">
