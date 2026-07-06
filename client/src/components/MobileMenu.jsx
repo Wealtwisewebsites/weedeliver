@@ -22,7 +22,7 @@ export default function MobileMenu() {
   const handleLogout = async () => { await logout(); go("/"); };
 
   return (
-    <div className="fixed inset-0 z-[60] lg:hidden">
+    <div className="fixed inset-0 z-[60]">
       <div className="absolute inset-0 bg-black/40" onClick={() => setMenuOpen(false)} />
       <div className="absolute inset-y-0 left-0 w-72 bg-white shadow-2xl flex flex-col">
         <div className="p-4 flex justify-between items-center border-b"><div className="flex items-center gap-1.5"><img src={LOGO_URL} alt="" className="h-8" /><span className="text-lg font-black" style={{ fontFamily: "'Outfit', sans-serif" }}><span className="text-green-700">WEE</span><span style={{ background: "linear-gradient(90deg, #15803d 50%, #111827 50%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>D</span><span className="text-gray-900">eliver</span></span></div><button onClick={() => setMenuOpen(false)}><X className="w-5 h-5" /></button></div>

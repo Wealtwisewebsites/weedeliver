@@ -16,8 +16,8 @@ export default function DispensaryProductsTab({ myIds, dispensaryId }) {
   const [form, setForm] = useState({ ...EMPTY_PRODUCT });
   const [editId, setEditId] = useState(null);
   const [filterCat, setFilterCat] = useState("ALL");
-  const flowerCategories = ["INDOOR_FLOWER", "GREENHOUSE_FLOWER", "CONCENTRATE", "EDIBLE", "ACCESSORY", "OTHER"];
-  const needsStrain = ["INDOOR_FLOWER", "GREENHOUSE_FLOWER", "CONCENTRATE"].includes(form.category);
+  const flowerCategories = ["INDOOR_FLOWER", "GREENHOUSE_FLOWER", "OUTDOOR_FLOWER", "CONCENTRATE", "EDIBLE", "ACCESSORY", "OTHER"];
+  const needsStrain = ["INDOOR_FLOWER", "GREENHOUSE_FLOWER", "OUTDOOR_FLOWER", "CONCENTRATE"].includes(form.category);
 
   const refreshProducts = async () => {
     if (!dispensaryId) return;

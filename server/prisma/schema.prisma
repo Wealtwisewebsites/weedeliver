@@ -141,6 +141,7 @@ model Order {
   membershipId        String?
   membership          Membership? @relation(fields: [membershipId], references: [id])
   status              String      @default("PENDING")
+  fulfillmentType     String      @default("DELIVERY") // DELIVERY | PICKUP
   deliveryAddress     String
   deliveryLat         Decimal?
   deliveryLng         Decimal?

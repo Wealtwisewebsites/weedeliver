@@ -3,7 +3,7 @@ export const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 export const DAY_LABELS = { mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday", fri: "Friday", sat: "Saturday", sun: "Sunday" };
 export const SA_BANKS = ["ABSA", "FNB", "Standard Bank", "Nedbank", "Capitec", "Investec", "TymeBank", "African Bank"];
 
-export const CATEGORY_LABELS = { INDOOR_FLOWER: "Indoor Flowers", GREENHOUSE_FLOWER: "Greenhouse", ACCESSORY: "Accessories", EDIBLE: "Edibles", CONCENTRATE: "Concentrates", OTHER: "Other" };
+export const CATEGORY_LABELS = { INDOOR_FLOWER: "Indoor Flowers", GREENHOUSE_FLOWER: "Greenhouse", OUTDOOR_FLOWER: "Outdoor Flowers", ACCESSORY: "Accessories", EDIBLE: "Edibles", CONCENTRATE: "Concentrates", OTHER: "Other" };
 
 export const STATUS_COLORS = {
   PENDING: "bg-yellow-50 text-yellow-700 border-yellow-200",
@@ -24,7 +24,7 @@ export const DISP_COLORS = { d1: "#1A7A2E", d2: "#b45309", d3: "#7c3aed", d4: "#
 export const EMPTY_PRODUCT = { name: "", category: "INDOOR_FLOWER", strainType: "HYBRID", price: "", unit: "per gram", stock: "", description: "", thcPercent: "", cbdPercent: "", effectSpectrum: 5 };
 
 export const CATEGORY_ICONS = {
-  INDOOR_FLOWER: "🌿", GREENHOUSE_FLOWER: "🌱", ACCESSORY: "🔧", EDIBLE: "🍫", CONCENTRATE: "💧", OTHER: "📦"
+  INDOOR_FLOWER: "🌿", GREENHOUSE_FLOWER: "🌱", OUTDOOR_FLOWER: "☀️", ACCESSORY: "🔧", EDIBLE: "🍫", CONCENTRATE: "💧", OTHER: "📦"
 };
 
 export const STRAIN_COLORS = {

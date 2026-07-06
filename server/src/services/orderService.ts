@@ -4,7 +4,8 @@ import { isDispensaryOpen } from "../utils.js";
 
 const createOrderSchema = z.object({
   dispensaryId: z.string().uuid(),
-  deliveryAddress: z.string().min(1),
+  fulfillmentType: z.enum(["DELIVERY", "PICKUP"]).optional().default("DELIVERY"),
+  deliveryAddress: z.string().optional(),
   deliveryLat: z.number().optional(),
   deliveryLng: z.number().optional(),
   specialInstructions: z.string().optional(),
@@ -14,12 +15,12 @@ const createOrderSchema = z.object({
   })).min(1),
 });
 
-// Allowed status transitions
+// Allowed status transitions. READY_FOR_PICKUP → DELIVERED covers customer collection (pickup orders).
 const TRANSITIONS: Record<string, string[]> = {
   PENDING: ["CONFIRMED", "CANCELLED"],
   CONFIRMED: ["PREPARING", "CANCELLED"],
   PREPARING: ["READY_FOR_PICKUP", "CANCELLED"],
-  READY_FOR_PICKUP: ["DRIVER_ASSIGNED", "CANCELLED"],
+  READY_FOR_PICKUP: ["DRIVER_ASSIGNED", "DELIVERED", "CANCELLED"],
   DRIVER_ASSIGNED: ["IN_TRANSIT", "CANCELLED"],
   IN_TRANSIT: ["DELIVERED", "CANCELLED"],
 };
@@ -46,6 +47,15 @@ export async function createOrder(customerId: string, data: unknown) {
     throw new Error("This dispensary is currently closed and not accepting orders.");
   }
 
+  // Fulfilment: delivery needs an address + fee; pickup is free and collected at the store.
+  const isPickup = parsed.fulfillmentType === "PICKUP";
+  if (!isPickup && (!parsed.deliveryAddress || !parsed.deliveryAddress.trim())) {
+    throw new Error("Delivery address is required");
+  }
+  const resolvedAddress = isPickup
+    ? `Collect at ${dispensary.name} — ${dispensary.address}`
+    : parsed.deliveryAddress!.trim();
+
   // Fetch products and calculate totals
   const productIds = parsed.items.map(i => i.productId);
   const products = await prisma.product.findMany({
@@ -61,7 +71,7 @@ export async function createOrder(customerId: string, data: unknown) {
   });
 
   const subtotal = itemsWithPrices.reduce((sum, i) => sum + Number(i.unitPrice) * i.quantity, 0);
-  const deliveryFee = Number(dispensary.deliveryFee);
+  const deliveryFee = isPickup ? 0 : Number(dispensary.deliveryFee);
   const total = subtotal + deliveryFee;
 
   if (subtotal < Number(dispensary.minimumOrder)) {
@@ -76,7 +86,8 @@ export async function createOrder(customerId: string, data: unknown) {
         dispensaryId: parsed.dispensaryId,
         membershipId: membership.id,
         status: "PENDING",
-        deliveryAddress: parsed.deliveryAddress,
+        fulfillmentType: parsed.fulfillmentType,
+        deliveryAddress: resolvedAddress,
         deliveryLat: parsed.deliveryLat,
         deliveryLng: parsed.deliveryLng,
         subtotal,
@@ -122,8 +133,14 @@ export async function updateOrderStatus(orderId: string, newStatus: string, user
   if (newStatus === "CONFIRMED" || newStatus === "PREPARING" || newStatus === "READY_FOR_PICKUP") {
     if (userRole !== "DISPENSARY" && userRole !== "ADMIN") throw new Error("Only dispensary can update to this status");
   }
-  if (newStatus === "DRIVER_ASSIGNED" || newStatus === "IN_TRANSIT" || newStatus === "DELIVERED") {
+  if (newStatus === "DRIVER_ASSIGNED" || newStatus === "IN_TRANSIT") {
     if (userRole !== "DRIVER" && userRole !== "ADMIN") throw new Error("Only driver can update to this status");
+  }
+  if (newStatus === "DELIVERED") {
+    // Drivers complete deliveries; the dispensary marks pickup orders as collected.
+    const dispensaryCollectingPickup = order.fulfillmentType === "PICKUP" && (userRole === "DISPENSARY" || userRole === "ADMIN");
+    const driverDelivering = userRole === "DRIVER" || userRole === "ADMIN";
+    if (!dispensaryCollectingPickup && !driverDelivering) throw new Error("Not permitted to complete this order");
   }
 
   // Build timestamp field
@@ -193,7 +210,7 @@ export async function getDispensaryOrders(dispensaryId: string) {
 
 export async function getAvailableDeliveries() {
   return prisma.order.findMany({
-    where: { status: "READY_FOR_PICKUP" },
+    where: { status: "READY_FOR_PICKUP", fulfillmentType: "DELIVERY" },
     include: {
       items: true,
       dispensary: { select: { name: true, address: true, lat: true, lng: true } },

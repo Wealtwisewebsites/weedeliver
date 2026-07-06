@@ -17,7 +17,7 @@ export default function Navbar() {
     <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200/50">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 h-11 sm:h-12 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <button onClick={() => setMenuOpen(true)} className="lg:hidden p-1.5 -ml-1 rounded-lg hover:bg-gray-100"><Menu className="w-5 h-5" /></button>
+          <button onClick={() => setMenuOpen(true)} aria-label="Menu" className="p-1.5 -ml-1 rounded-lg hover:bg-gray-100"><Menu className="w-5 h-5" /></button>
           <button onClick={() => nav("/")} className="flex items-center gap-1"><img src={LOGO_URL} alt="WeeDeliver" className="h-7 sm:h-9 object-contain" /><span className="text-sm sm:text-base font-black tracking-tight" style={{ fontFamily: "'Outfit', sans-serif" }}><span className="text-green-700">WEE</span><span style={{ background: "linear-gradient(90deg, #15803d 50%, #111827 50%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>D</span><span className="text-gray-900">eliver</span></span></button>
         </div>
         <div className="flex items-center gap-1.5">

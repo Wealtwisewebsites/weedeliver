@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, MapPin, CreditCard, AlertCircle, RefreshCw } from "lucide-react";
+import { ArrowLeft, MapPin, CreditCard, AlertCircle, RefreshCw, Truck, Store } from "lucide-react";
 import { formatZAR } from "../lib/formatters";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -13,6 +13,7 @@ export default function CheckoutPage() {
   const { cart, cartTotal, clearCart } = useCart();
   const { notify } = useUI();
   const [pay, setPay] = useState("yoco");
+  const [fulfillment, setFulfillment] = useState("DELIVERY");
   const [addr, setAddr] = useState("");
   const [dob, setDob] = useState("");
   const [processing, setProcessing] = useState(false);
@@ -31,11 +32,13 @@ export default function CheckoutPage() {
 
   if (cart.length === 0) return <div className="max-w-md mx-auto px-4 py-12 text-center"><p className="text-gray-500">Cart empty</p><button onClick={() => nav("/")} className="mt-3 px-5 py-2 rounded-full bg-green-600 text-white font-semibold text-sm">Shop</button></div>;
 
-  const totalAmount = cartTotal + Number(cartDispensary?.deliveryFee || 0);
+  const isPickup = fulfillment === "PICKUP";
+  const deliveryFee = isPickup ? 0 : Number(cartDispensary?.deliveryFee || 0);
+  const totalAmount = cartTotal + deliveryFee;
 
   const handlePlaceOrder = async () => {
     setPaymentError(null);
-    if (!addr.trim()) { setPaymentError("Please enter a delivery address."); return; }
+    if (!isPickup && !addr.trim()) { setPaymentError("Please enter a delivery address."); return; }
     setProcessing(true);
 
     // 1. Age verification (18+) — required before any cannabis order can be placed.
@@ -56,7 +59,8 @@ export default function CheckoutPage() {
     // 3. Create the order.
     const orderRes = await api("POST", "/orders", {
       dispensaryId: cart[0].dispensaryId,
-      deliveryAddress: addr,
+      fulfillmentType: fulfillment,
+      ...(isPickup ? {} : { deliveryAddress: addr }),
       items: cart.map(i => ({ productId: i.id, quantity: i.quantity })),
     });
     if (!orderRes.ok || !orderRes.data?.id) {
@@ -94,7 +98,29 @@ export default function CheckoutPage() {
       <button onClick={() => nav("/cart")} className="flex items-center gap-1 text-gray-500 text-xs sm:text-sm mb-2 sm:mb-3"><ArrowLeft className="w-4 h-4" /> Cart</button>
       <h1 className="text-lg sm:text-xl font-black mb-3 sm:mb-4" style={{ fontFamily: "'Outfit', sans-serif" }}>Checkout</h1>
       <div className="space-y-4">
-        <div className="bg-white rounded-xl p-4 border"><h3 className="font-bold text-sm mb-2"><MapPin className="w-4 h-4 inline text-green-600 mr-1" />Delivery Address</h3><input value={addr} onChange={e => setAddr(e.target.value)} placeholder="Street, suburb, city" className="w-full px-3 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-green-500 outline-none" /></div>
+        <div className="bg-white rounded-xl p-4 border">
+          <h3 className="font-bold text-sm mb-3">How would you like to get your order?</h3>
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            {[{ v: "DELIVERY", l: "Delivery", ic: Truck, sub: Number(cartDispensary?.deliveryFee) ? formatZAR(cartDispensary.deliveryFee) : "Free" }, { v: "PICKUP", l: "Pickup", ic: Store, sub: "Free — collect yourself" }].map(o => (
+              <button key={o.v} onClick={() => setFulfillment(o.v)} className={`p-3 rounded-xl border text-left transition-all ${fulfillment === o.v ? "border-green-500 bg-green-50 ring-1 ring-green-500" : "border-gray-200 hover:border-gray-300"}`}>
+                <o.ic className={`w-5 h-5 mb-1 ${fulfillment === o.v ? "text-green-600" : "text-gray-400"}`} />
+                <div className="text-sm font-bold">{o.l}</div>
+                <div className="text-[10px] text-gray-500">{o.sub}</div>
+              </button>
+            ))}
+          </div>
+          {isPickup ? (
+            <div className="bg-green-50 rounded-xl p-3 border border-green-100 flex items-start gap-2">
+              <Store className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+              <p className="text-[11px] text-green-800">You'll collect this order from <b>{cartDispensary?.name || "the dispensary"}</b>{cartDispensary?.address ? ` — ${cartDispensary.address}` : ""}. No driver needed — we'll notify you when it's ready.</p>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-[11px] font-medium text-gray-500 mb-1"><MapPin className="w-3.5 h-3.5 inline text-green-600 mr-0.5" />Delivery Address</label>
+              <input value={addr} onChange={e => setAddr(e.target.value)} placeholder="Street, suburb, city" className="w-full px-3 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-green-500 outline-none" />
+            </div>
+          )}
+        </div>
         {needsAge && (
           <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
             <h3 className="font-bold text-sm mb-1 text-amber-800">Age Verification (18+)</h3>
@@ -113,7 +139,7 @@ export default function CheckoutPage() {
         </div>
         <div className="bg-white rounded-xl p-4 border"><h3 className="font-bold text-sm mb-2">Order Summary</h3>
           {cart.map(i => <div key={i.id} className="flex justify-between text-sm py-0.5"><span className="text-gray-600">{i.quantity}x {i.name}</span><span>{formatZAR(i.price * i.quantity)}</span></div>)}
-          <hr className="my-2" /><div className="flex justify-between text-sm"><span className="text-gray-500">Delivery</span><span>{formatZAR(cartDispensary?.deliveryFee || 0)}</span></div>
+          <hr className="my-2" /><div className="flex justify-between text-sm"><span className="text-gray-500">{isPickup ? "Pickup" : "Delivery"}</span><span>{isPickup ? "Free" : formatZAR(deliveryFee)}</span></div>
           <div className="flex justify-between mt-1"><span className="font-bold">Total</span><span className="font-black text-green-700 text-lg">{formatZAR(totalAmount)}</span></div>
         </div>
         {paymentError && <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2"><AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" /><span className="text-xs text-red-700">{paymentError}</span></div>}

@@ -4,7 +4,6 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { formatZAR, timeAgo, isDispensaryOpen } from "../lib/formatters";
 import { api } from "../lib/api";
 import { DAY_KEYS, DAY_LABELS, SA_BANKS, CATEGORY_ICONS, STRAIN_COLORS } from "../lib/constants";
-import { REVENUE_DATA } from "../lib/mockData";
 import { StatusBadge } from "../components/StatusBadge";
 import ImageUploadBox from "../components/ImageUploadBox";
 import DispensaryProductsTab from "./DispensaryProductsTab";
@@ -52,6 +51,23 @@ export default function DispensaryDashboardPage() {
   const pending = myOrders.filter(o => o.status === "PENDING");
   const active = myOrders.filter(o => !["DELIVERED", "CANCELLED"].includes(o.status));
   const rev = myOrders.filter(o => o.status === "DELIVERED").reduce((s, o) => s + Number(o.total || 0), 0);
+
+  // Real revenue for the last 7 days, from delivered orders (accurate — no mock data).
+  const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const revenueData = (() => {
+    const buckets = {};
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now); d.setDate(now.getDate() - i);
+      buckets[d.toISOString().slice(0, 10)] = { day: DAY_NAMES[d.getDay()], revenue: 0 };
+    }
+    myOrders.filter(o => o.status === "DELIVERED").forEach(o => {
+      const key = String(o.deliveredAt || o.createdAt || "").slice(0, 10);
+      if (buckets[key]) buckets[key].revenue += Number(o.total || 0);
+    });
+    return Object.values(buckets);
+  })();
+  const hasSales = myOrders.some(o => o.status === "DELIVERED");
 
   const [editDisp, setEditDisp] = useState(null);
   useEffect(() => { if (myDisps.length > 0 && !editDisp) setEditDisp(hydrateDisp(myDisps[0])); }, [myDisps]);
@@ -184,7 +200,10 @@ export default function DispensaryDashboardPage() {
         {myOrders.map(o => (
           <div key={o.id} className={`bg-white rounded-xl p-3.5 border transition-all ${o.status === "PENDING" ? "border-amber-300 ring-1 ring-amber-100 shadow-md" : "border-gray-100"}`}>
             <div className="flex items-center justify-between mb-1.5">
-              <div><p className="font-bold text-sm">#{o.id.toUpperCase()}</p><p className="text-[11px] text-gray-500">{o.customerName} · {timeAgo(o.createdAt)}</p></div>
+              <div className="flex items-center gap-2 min-w-0">
+                <div><p className="font-bold text-sm">#{o.id.toUpperCase()}</p><p className="text-[11px] text-gray-500">{o.customerName} · {timeAgo(o.createdAt)}</p></div>
+                {o.fulfillmentType === "PICKUP" && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 whitespace-nowrap">PICKUP</span>}
+              </div>
               <StatusBadge status={o.status} />
             </div>
             <p className="text-xs text-gray-600 mb-1">{(o.items || []).map(i => `${i.quantity}× ${i.productName}`).join(", ")}</p>
@@ -195,10 +214,12 @@ export default function DispensaryDashboardPage() {
                 {o.status === "PENDING" && <><button onClick={() => updateOrderStatus(o.id, "CONFIRMED")} className="px-3 py-1.5 rounded-lg bg-green-600 text-white text-[11px] font-bold flex items-center gap-1"><Check className="w-3 h-3" />Accept</button><button onClick={() => updateOrderStatus(o.id, "CANCELLED")} className="px-2.5 py-1.5 rounded-lg bg-red-100 text-red-700 text-[11px] font-bold">Decline</button></>}
                 {o.status === "CONFIRMED" && <button onClick={() => updateOrderStatus(o.id, "PREPARING")} className="px-3 py-1.5 rounded-lg bg-orange-500 text-white text-[11px] font-bold">Start Preparing</button>}
                 {o.status === "PREPARING" && <button onClick={() => updateOrderStatus(o.id, "READY_FOR_PICKUP")} className="px-3 py-1.5 rounded-lg bg-cyan-600 text-white text-[11px] font-bold">Ready for Pickup</button>}
-                {o.status === "READY_FOR_PICKUP" && <span className="text-[11px] text-gray-500 italic">Waiting for driver...</span>}
+                {o.status === "READY_FOR_PICKUP" && (o.fulfillmentType === "PICKUP"
+                  ? <button onClick={() => updateOrderStatus(o.id, "DELIVERED")} className="px-3 py-1.5 rounded-lg bg-green-600 text-white text-[11px] font-bold flex items-center gap-1"><Check className="w-3 h-3" />Mark Collected</button>
+                  : <span className="text-[11px] text-gray-500 italic">Waiting for driver...</span>)}
                 {o.status === "DRIVER_ASSIGNED" && <span className="text-[11px] text-indigo-600 font-medium">Driver {o.driverName} coming</span>}
                 {o.status === "IN_TRANSIT" && <span className="text-[11px] text-purple-600 font-medium">In transit</span>}
-                {o.status === "DELIVERED" && <span className="text-[11px] text-green-600 font-semibold flex items-center gap-1"><CheckCircle className="w-3 h-3" />Delivered</span>}
+                {o.status === "DELIVERED" && <span className="text-[11px] text-green-600 font-semibold flex items-center gap-1"><CheckCircle className="w-3 h-3" />{o.fulfillmentType === "PICKUP" ? "Collected" : "Delivered"}</span>}
               </div>
             </div>
           </div>
@@ -384,7 +405,32 @@ export default function DispensaryDashboardPage() {
         </div>
       )}
 
-      {tab === "analytics" && <div className="bg-white rounded-xl p-4 border"><h3 className="font-bold text-sm mb-3">Revenue</h3><ResponsiveContainer width="100%" height={180}><AreaChart data={REVENUE_DATA}><defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#1A7A2E" stopOpacity={0.2} /><stop offset="95%" stopColor="#1A7A2E" stopOpacity={0} /></linearGradient></defs><CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" /><XAxis dataKey="day" tick={{ fontSize: 11 }} /><YAxis tick={{ fontSize: 11 }} /><Tooltip /><Area type="monotone" dataKey="revenue" stroke="#1A7A2E" fill="url(#g1)" strokeWidth={2} /></AreaChart></ResponsiveContainer></div>}
+      {tab === "analytics" && (
+        <div className="bg-white rounded-xl p-4 border">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-sm">Revenue — last 7 days</h3>
+            <span className="text-sm font-black text-green-700">{formatZAR(rev)}</span>
+          </div>
+          {hasSales ? (
+            <ResponsiveContainer width="100%" height={180}>
+              <AreaChart data={revenueData}>
+                <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#1A7A2E" stopOpacity={0.2} /><stop offset="95%" stopColor="#1A7A2E" stopOpacity={0} /></linearGradient></defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="day" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v) => [formatZAR(v), "Revenue"]} />
+                <Area type="monotone" dataKey="revenue" stroke="#1A7A2E" fill="url(#g1)" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="py-12 text-center">
+              <BarChart3 className="w-10 h-10 text-gray-200 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-gray-600">No sales yet</p>
+              <p className="text-xs text-gray-400 mt-1">Your revenue chart will fill in automatically as delivered orders come in.</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

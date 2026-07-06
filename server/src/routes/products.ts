@@ -11,7 +11,7 @@ const productSchema = z.object({
   dispensaryId: z.string().uuid(),
   name: z.string().min(1),
   description: z.string().optional(),
-  category: z.enum(["INDOOR_FLOWER", "GREENHOUSE_FLOWER", "ACCESSORY", "EDIBLE", "CONCENTRATE", "OTHER"]).default("OTHER"),
+  category: z.enum(["INDOOR_FLOWER", "GREENHOUSE_FLOWER", "OUTDOOR_FLOWER", "ACCESSORY", "EDIBLE", "CONCENTRATE", "OTHER"]).default("OTHER"),
   price: z.number().positive(),
   unit: z.string().default("per gram"),
   thcPercent: z.number().nullable().optional(),
