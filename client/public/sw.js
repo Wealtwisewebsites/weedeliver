@@ -1,18 +1,18 @@
-// WeeDeliver service worker — enables PWA install + basic offline support.
-// It ONLY touches same-origin GET requests; API calls (Render), Yoco, and fonts pass through untouched.
-const CACHE = "weedeliver-v1";
-const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/leaf.svg"];
+// WeeDeliver service worker — network-first, self-healing.
+// Online users ALWAYS get the latest app (no stale cache = no blank screens).
+// The cache is used only as an offline fallback. Only same-origin GET requests are handled;
+// API calls (Render), Yoco, Supabase and fonts pass through untouched.
+const CACHE = "weedeliver-v2";
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())
-  );
+self.addEventListener("install", () => {
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
+    // Purge ALL previous caches (recovers anyone stuck on an old/broken cache) then take control.
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -22,36 +22,21 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return;
 
   const url = new URL(req.url);
-  // Leave cross-origin requests (API on Render, Yoco SDK, Google Fonts, Supabase) completely alone.
-  if (url.origin !== self.location.origin) return;
+  if (url.origin !== self.location.origin) return; // leave API/cross-origin alone
 
-  // App navigations: network-first so users always get the latest app; fall back to cached shell offline.
-  if (req.mode === "navigate") {
-    event.respondWith(
-      fetch(req)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put("/index.html", copy));
-          return res;
-        })
-        .catch(() => caches.match("/index.html").then((r) => r || caches.match("/")))
-    );
-    return;
-  }
-
-  // Same-origin static assets: serve from cache immediately, refresh in the background.
   event.respondWith(
-    caches.match(req).then((cached) => {
-      const network = fetch(req)
-        .then((res) => {
-          if (res && res.status === 200) {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy));
-          }
-          return res;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
+    fetch(req)
+      .then((res) => {
+        if (res && res.status === 200) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy));
+        }
+        return res;
+      })
+      .catch(() =>
+        caches.match(req).then((cached) =>
+          cached || (req.mode === "navigate" ? caches.match("/index.html") : undefined)
+        )
+      )
   );
 });
