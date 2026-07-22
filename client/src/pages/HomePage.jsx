@@ -432,6 +432,7 @@ export default function HomePage() {
             <p>&copy; 2026 WeeDeliver. All rights reserved.</p>
             <p className="flex items-center gap-1.5"><LeafIcon className="w-3.5 h-3.5 text-green-500" /> For adults 18+ only. Consume responsibly.</p>
           </div>
+          <div className="max-w-7xl mx-auto px-4 pb-5 text-center text-[11px] text-gray-500">Built by <span className="font-semibold text-gray-400">Wealthwise Media</span></div>
         </div>
       </footer>
     </div>

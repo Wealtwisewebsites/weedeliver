@@ -11,6 +11,7 @@ import Navbar from "./components/Navbar";
 import MobileMenu from "./components/MobileMenu";
 import ActivityLogPanel from "./components/ActivityLogPanel";
 import ProtectedRoute from "./components/ProtectedRoute";
+import InstallPrompt from "./components/InstallPrompt";
 
 const HomePage = lazy(() => import("./pages/HomePage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
@@ -85,6 +86,7 @@ function AppShell() {
       </main>
       {showLog && <ActivityLogPanel />}
       <MobileMenu />
+      <InstallPrompt />
     </div>
   );
 }
