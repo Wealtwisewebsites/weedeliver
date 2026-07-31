@@ -218,3 +218,15 @@ export async function getAvailableDeliveries() {
     orderBy: { createdAt: "asc" },
   });
 }
+
+// A driver's own deliveries (assigned, in transit, completed) — powers the Active & Earnings tabs.
+export async function getDriverOrders(driverId: string) {
+  return prisma.order.findMany({
+    where: { driverId },
+    include: {
+      items: true,
+      dispensary: { select: { name: true, address: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+}

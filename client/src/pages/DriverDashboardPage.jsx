@@ -32,11 +32,19 @@ export default function DriverDashboardPage() {
       setProfileLoading(false);
     });
   }, []);
-  useEffect(() => {
-    api("GET", "/orders").then(res => {
-      if (res.ok && res.data) setOrders(res.data);
-    });
-  }, []);
+  // Available deliveries (ready-for-pickup, unassigned) come from one endpoint; the driver's
+  // own assigned/completed deliveries come from another. Merge both into `orders`.
+  const loadOrders = () => Promise.all([
+    api("GET", "/orders/driver/available"),
+    api("GET", "/orders/driver/mine"),
+  ]).then(([av, mine]) => {
+    const norm = (o) => ({ ...o, dispensaryName: o.dispensary?.name || o.dispensaryName });
+    const list = [];
+    if (av.ok && Array.isArray(av.data)) list.push(...av.data.map(norm));
+    if (mine.ok && Array.isArray(mine.data)) list.push(...mine.data.map(norm));
+    setOrders(list);
+  });
+  useEffect(() => { loadOrders(); }, []);
 
   const available = orders.filter(o => o.status === "READY_FOR_PICKUP");
   const myDel = orders.filter(o => o.driverId === currentUser?.id);
@@ -52,8 +60,11 @@ export default function DriverDashboardPage() {
     }
   };
 
-  const acceptDelivery = (orderId) => {
-    updateOrderStatus(orderId, "DRIVER_ASSIGNED", { driverId: currentUser.id, driverName: currentUser.firstName });
+  const acceptDelivery = async (orderId) => {
+    // Use the guarded endpoint — it enforces driver approval and assigns the driver server-side.
+    const res = await api("POST", `/orders/${orderId}/accept-delivery`);
+    if (!res.ok) { notify(res.data?.error || "Couldn't accept this delivery — please try again.", "error"); return; }
+    await loadOrders();
     setTab("active");
   };
 

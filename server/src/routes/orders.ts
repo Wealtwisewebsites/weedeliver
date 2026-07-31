@@ -73,6 +73,14 @@ router.get("/driver/available", authenticate, requireRole("DRIVER"), async (req:
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+// A driver's own deliveries (active + completed) — powers the Active & Earnings tabs
+router.get("/driver/mine", authenticate, requireRole("DRIVER"), async (req: Request, res: Response) => {
+  try {
+    const orders = await orderService.getDriverOrders(req.user!.id);
+    res.json(orders);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 // Update order status
 router.put("/:id/status", authenticate, async (req: Request, res: Response) => {
   try {
