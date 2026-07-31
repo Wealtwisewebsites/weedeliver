@@ -3,7 +3,7 @@ import { authenticate } from "../middleware/auth.js";
 import { requireRole, requireAge } from "../middleware/guards.js";
 import * as orderService from "../services/orderService.js";
 import prisma from "../prisma.js";
-import { notifyOrderCustomer, notifyOrderDispensary } from "../services/notifications.js";
+import { notifyOrderCustomer, notifyOrderDispensary, notifyDriversNewDelivery } from "../services/notifications.js";
 
 const router = Router();
 
@@ -88,6 +88,22 @@ router.put("/:id/status", authenticate, async (req: Request, res: Response) => {
       io.to(`dispensary:${order.dispensaryId}`).emit("order_update", order);
       if (status === "READY_FOR_PICKUP") io.to("drivers").emit("new_delivery", order);
       io.to("admin").emit("order_update", order);
+    }
+
+    // Email approved drivers when a delivery order becomes available for pickup.
+    if (status === "READY_FOR_PICKUP" && order.fulfillmentType === "DELIVERY") {
+      prisma.driver.findMany({ where: { status: "APPROVED" }, select: { user: { select: { email: true } } } })
+        .then((drivers) => {
+          const emails = drivers.map((d) => d.user?.email).filter((e): e is string => !!e);
+          void notifyDriversNewDelivery(emails, order.dispensary?.name || "A dispensary", {
+            id: order.id,
+            total: Number(order.total),
+            deliveryAddress: order.deliveryAddress,
+            deliveryFee: Number(order.deliveryFee),
+            items: (order.items || []).map((i: any) => ({ productName: i.productName, quantity: i.quantity })),
+          });
+        })
+        .catch(() => {});
     }
 
     res.json(order);

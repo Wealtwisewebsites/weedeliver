@@ -110,3 +110,18 @@ export function notifyOrderDispensary(to: string, dispensaryName: string, custom
        Open your dashboard to accept and prepare it.`,
       { label: "Open dashboard", url: `${APP_URL}/dashboard/dispensary` }));
 }
+
+// Notify approved drivers that a delivery is up for grabs (fired when an order is ready for pickup).
+export async function notifyDriversNewDelivery(driverEmails: string[], dispensaryName: string, order: OrderEmailData & { deliveryFee?: number | string }) {
+  const uniq = [...new Set((driverEmails || []).filter(Boolean))];
+  const fee = order.deliveryFee != null ? ZAR(order.deliveryFee) : "";
+  await Promise.all(uniq.map((to) =>
+    sendEmail(to, `New delivery available — #${order.id.slice(0, 8).toUpperCase()}`,
+      wrap(`A new delivery is available 🛵`,
+        `<b>${dispensaryName}</b> has an order ready for pickup.<br/><br/>
+         <b>Deliver to:</b> ${order.deliveryAddress}<br/>
+         ${fee ? `<b>Your fee:</b> ${fee}<br/>` : ""}<br/>
+         Open your dashboard and go online to accept it before another driver does.`,
+        { label: "Accept delivery", url: `${APP_URL}/dashboard/driver` }))
+  ));
+}
