@@ -14,7 +14,7 @@ export default function Navbar() {
   const handleLogout = async () => { await logout(); nav("/"); };
 
   return (
-    <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200/50">
+    <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 pt-safe px-safe">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 h-11 sm:h-12 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <button onClick={() => setMenuOpen(true)} aria-label="Menu" className="p-1.5 -ml-1 rounded-lg hover:bg-gray-100"><Menu className="w-5 h-5" /></button>

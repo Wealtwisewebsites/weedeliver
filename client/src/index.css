@@ -7,6 +7,14 @@
   box-sizing: border-box;
 }
 
+/* iOS standalone (PWA) safe areas — keep UI clear of the status bar / notch / Dynamic Island.
+   The app uses apple-mobile-web-app-status-bar-style=black-translucent, so content renders
+   full-bleed behind the status bar; these pad interactive/top surfaces back into the safe area. */
+.pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.px-safe { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.top-safe { top: env(safe-area-inset-top, 0px); }
+
 html {
   scroll-behavior: smooth;
 }

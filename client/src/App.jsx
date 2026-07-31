@@ -47,7 +47,7 @@ function Toast() {
   const { toast } = useUI();
   if (!toast) return null;
   return (
-    <div key={toast.id} className={`fixed top-4 right-4 z-[100] px-5 py-3 rounded-2xl shadow-2xl text-white text-sm font-medium flex items-center gap-2 ${toast.type === "success" ? "bg-green-600" : "bg-red-500"}`} style={{ animation: "slideIn .3s ease-out" }}>
+    <div key={toast.id} className={`fixed right-4 z-[100] px-5 py-3 rounded-2xl shadow-2xl text-white text-sm font-medium flex items-center gap-2 ${toast.type === "success" ? "bg-green-600" : "bg-red-500"}`} style={{ top: "calc(1rem + env(safe-area-inset-top, 0px))", animation: "slideIn .3s ease-out" }}>
       {toast.type === "success" ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}{toast.msg}
     </div>
   );
