@@ -12,7 +12,10 @@ router.post("/register", async (req: Request, res: Response) => {
     res.cookie("refreshToken", result.refreshToken, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", maxAge: 7 * 24 * 60 * 60 * 1000 });
     // Customers get a welcome email on signup; dispensaries/drivers are emailed when they apply.
     if (result.user.role === "CUSTOMER") void notifyCustomerWelcome(result.user.email, result.user.firstName);
-    res.status(201).json({ user: result.user, accessToken: result.accessToken });
+    // refreshToken is also returned in the body: the SPA and API are on different sites, so the
+    // httpOnly cookie is third-party and Safari/iOS blocks it. The client keeps this only when
+    // the user ticks "Remember me".
+    res.status(201).json({ user: result.user, accessToken: result.accessToken, refreshToken: result.refreshToken });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -22,7 +25,7 @@ router.post("/login", async (req: Request, res: Response) => {
   try {
     const result = await authService.login(req.body);
     res.cookie("refreshToken", result.refreshToken, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", maxAge: 7 * 24 * 60 * 60 * 1000 });
-    res.json({ user: result.user, accessToken: result.accessToken });
+    res.json({ user: result.user, accessToken: result.accessToken, refreshToken: result.refreshToken });
   } catch (err: any) {
     res.status(401).json({ error: err.message });
   }
@@ -35,11 +38,12 @@ router.post("/logout", (_req: Request, res: Response) => {
 
 router.post("/refresh", async (req: Request, res: Response) => {
   try {
-    const token = req.cookies?.refreshToken;
+    // Fall back to the body when the cookie is unavailable (Safari/iOS block third-party cookies).
+    const token = req.cookies?.refreshToken || req.body?.refreshToken;
     if (!token) return res.status(401).json({ error: "No refresh token" });
     const tokens = await authService.refreshAccessToken(token);
     res.cookie("refreshToken", tokens.refreshToken, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", maxAge: 7 * 24 * 60 * 60 * 1000 });
-    res.json({ accessToken: tokens.accessToken });
+    res.json({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
   } catch (err: any) {
     res.status(401).json({ error: err.message });
   }

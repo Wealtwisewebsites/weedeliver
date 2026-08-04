@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -24,7 +25,7 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     if (mode === "login") {
-      const res = await login(email, password);
+      const res = await login(email, password, remember);
       if (res.ok) {
         notify(`Welcome back, ${res.user.firstName}!`);
         const dm = { CUSTOMER: "/", DISPENSARY: "/dashboard/dispensary", DRIVER: "/dashboard/driver", ADMIN: "/dashboard/admin" };
@@ -68,6 +69,12 @@ export default function LoginPage() {
           </>}
           <div><label className="block text-[11px] text-gray-500 mb-1">Email</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@email.com" className="w-full px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-green-500" /></div>
           <div><label className="block text-[11px] text-gray-500 mb-1">Password</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 6 characters" className="w-full px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-green-500" onKeyDown={e => e.key === "Enter" && handleSubmit()} /></div>
+          {mode === "login" && (
+            <label className="flex items-center gap-2 cursor-pointer select-none py-0.5">
+              <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 accent-green-600 cursor-pointer" />
+              <span className="text-xs text-gray-600 font-medium">Keep me signed in</span>
+            </label>
+          )}
           {error && <div className="bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-700 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />{error}</div>}
           <button onClick={handleSubmit} disabled={loading || !email || !password} className={`w-full py-3 rounded-xl text-white font-bold text-sm shadow-lg transition ${loading ? "opacity-60" : "hover:shadow-xl"}`} style={{ background: "linear-gradient(135deg, #1A7A2E, #2d9a4a)" }}>{loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}</button>
           <div className="text-center text-[11px] text-gray-400 pt-1">{mode === "login" ? "Welcome back to WeeDeliver" : "You can also register as a Dispensary or Driver"}</div>

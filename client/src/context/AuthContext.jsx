@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { api } from "../lib/api";
+import { api, setRefreshToken, clearAuthTokens } from "../lib/api";
 
 const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
@@ -26,16 +26,21 @@ export function AuthProvider({ children }) {
     const res = await api("POST", "/auth/register", userData);
     if (res.ok && res.data) {
       localStorage.setItem("wd_token", res.data.accessToken);
+      // Keep new signups signed in — being logged out moments after registering is jarring.
+      setRefreshToken(res.data.refreshToken);
       setCurrentUser(res.data.user);
       return { ok: true, user: res.data.user };
     }
     return { ok: false, error: res.data?.error || "Registration failed" };
   }, []);
 
-  const login = useCallback(async (email, password) => {
+  // `remember` keeps the user signed in across visits by storing the refresh token locally —
+  // needed because the httpOnly refresh cookie is third-party here and Safari/iOS block it.
+  const login = useCallback(async (email, password, remember = false) => {
     const res = await api("POST", "/auth/login", { email, password });
     if (res.ok && res.data) {
       localStorage.setItem("wd_token", res.data.accessToken);
+      if (remember) setRefreshToken(res.data.refreshToken);
       setCurrentUser(res.data.user);
       return { ok: true, user: res.data.user };
     }
@@ -44,7 +49,7 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(async () => {
     await api("POST", "/auth/logout");
-    localStorage.removeItem("wd_token");
+    clearAuthTokens();
     setCurrentUser(null);
     setAgeVerified(false);
   }, []);

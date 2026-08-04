@@ -33,23 +33,27 @@ export default function DispensaryDashboardPage() {
   const [myDisps, setMyDisps] = useState([]);
   const [myOrders, setMyOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   useEffect(() => { markRead("DISPENSARY"); }, [tab]);
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      const res = await api("GET", "/dispensaries/mine");
-      if (res.ok && Array.isArray(res.data)) {
-        setMyDisps(res.data);
-        if (res.data.length > 0) {
-          const ordRes = await api("GET", `/orders/dispensary/${res.data[0].id}`);
-          if (ordRes.ok && ordRes.data) setMyOrders(ordRes.data);
-        }
+  const load = async () => {
+    setLoading(true);
+    const res = await api("GET", "/dispensaries/mine");
+    if (res.ok && Array.isArray(res.data)) {
+      setLoadError(null);
+      setMyDisps(res.data);
+      if (res.data.length > 0) {
+        const ordRes = await api("GET", `/orders/dispensary/${res.data[0].id}`);
+        if (ordRes.ok && ordRes.data) setMyOrders(ordRes.data);
       }
-      setLoading(false);
-    };
-    load();
-  }, [currentUser?.id]);
+    } else {
+      // The request failed (expired session, network, server error). Never treat this as
+      // "you have no dispensary" — that wrongly pushes an existing owner into the create form.
+      setLoadError(res.status === 401 ? "Your session expired. Please sign in again." : "Couldn't load your store. Check your connection and try again.");
+    }
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, [currentUser?.id]);
 
   const myIds = myDisps.map(d => d.id);
   const pending = myOrders.filter(o => o.status === "PENDING");
@@ -74,7 +78,14 @@ export default function DispensaryDashboardPage() {
   const hasSales = myOrders.some(o => o.status === "DELIVERED");
 
   const [editDisp, setEditDisp] = useState(null);
-  useEffect(() => { if (myDisps.length > 0 && !editDisp) setEditDisp(hydrateDisp(myDisps[0])); }, [myDisps]);
+  // Re-sync whenever the owned dispensary changes (e.g. after switching accounts). The old
+  // `!editDisp` guard pinned this to the first store ever loaded, so saving could target a
+  // dispensary the current user doesn't own — the server rightly rejected it as "Not the owner".
+  useEffect(() => {
+    const mine = myDisps[0];
+    if (!mine) { setEditDisp(null); return; }
+    setEditDisp(prev => (prev && prev.id === mine.id ? prev : hydrateDisp(mine)));
+  }, [myDisps]);
 
   const [creating, setCreating] = useState(false);
   const [newDisp, setNewDisp] = useState({ name: "", slug: "", city: "", province: "Gauteng", address: "", bio: "", tagline: "", deliveryFee: 35, minimumOrder: 100, deliveryRadius: 15, deliveryTime: "25-35 min" });
@@ -145,6 +156,19 @@ export default function DispensaryDashboardPage() {
     setSavingStore(false);
     notify("Changes saved!");
   };
+
+  // A failed load must not look like "no store yet" — show the reason and let them retry.
+  if (!loading && loadError) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-12 text-center">
+        <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4"><AlertCircle className="w-7 h-7 text-amber-600" /></div>
+        <h1 className="text-xl font-black mb-2" style={{ fontFamily: "'Outfit', sans-serif" }}>Couldn't load your store</h1>
+        <p className="text-gray-500 text-sm mb-5">{loadError}</p>
+        <p className="text-[11px] text-gray-400 mb-5">Your store and its data are safe — this is only a loading problem.</p>
+        <button onClick={load} className="px-6 py-2.5 rounded-full bg-green-700 text-white text-sm font-bold hover:bg-green-800 transition-all">Try again</button>
+      </div>
+    );
+  }
 
   if (!loading && myDisps.length === 0) {
     return (

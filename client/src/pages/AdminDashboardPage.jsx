@@ -144,7 +144,7 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="bg-white rounded-xl border p-4">
                   <p className="text-[11px] text-gray-500 font-medium mb-1">Driver Fleet</p>
-                  <p className="text-3xl font-black text-blue-600">{drivers.length}</p>
+                  <p className="text-3xl font-black text-blue-600">{driverApps.length}</p>
                   <p className="text-[10px] text-gray-400 mt-1">registered drivers</p>
                 </div>
               </div>
