@@ -128,11 +128,23 @@ export default function DispensaryDashboardPage() {
       deliveryFee: editDisp.deliveryFee,
       minimumOrder: editDisp.minimumOrder,
       deliveryRadius: editDisp.deliveryRadius,
+      address: editDisp.address,
+      city: editDisp.city,
+      province: editDisp.province,
       operatingHours: editDisp.operatingHours,
       socialLinks: editDisp.socialLinks,
     };
     const res = await api("PUT", `/dispensaries/${editDisp.id}`, payload);
-    if (!res.ok) { notify(res.data?.error || "Failed to save changes", "error"); setSavingStore(false); return; }
+    if (!res.ok) {
+      // Say *why* it failed — a silent "failed to save" after a session expiry looks like the
+      // form is broken, which is exactly how this was reported.
+      const msg = res.status === 401
+        ? "Your session expired — please sign in again, then save."
+        : res.data?.error || "Failed to save changes";
+      notify(msg, "error");
+      setSavingStore(false);
+      return;
+    }
 
     // Banking has its own encrypted endpoint — only save when all fields are filled in.
     const b = editDisp.banking;
@@ -145,6 +157,7 @@ export default function DispensaryDashboardPage() {
         accountType: b.accountType,
       });
       if (!bres.ok) notify(bres.data?.error || "Store saved, but banking details didn't save", "error");
+      else setEditDisp(prev => ({ ...prev, banking: { ...prev.banking, saved: true } }));
     }
 
     // Reload canonical state from the server so the UI reflects exactly what persisted.
@@ -293,6 +306,17 @@ export default function DispensaryDashboardPage() {
             <div><label className="block text-[11px] font-medium text-gray-500 mb-1">Store Name</label><input value={editDisp.name} onChange={e => setEditDisp({ ...editDisp, name: e.target.value })} className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-green-500 outline-none" /></div>
             <div><label className="block text-[11px] font-medium text-gray-500 mb-1">Tagline</label><input value={editDisp.tagline || ""} onChange={e => setEditDisp({ ...editDisp, tagline: e.target.value })} placeholder="Short catchy phrase..." className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-green-500 outline-none" /></div>
             <div><label className="block text-[11px] font-medium text-gray-500 mb-1">Bio / Description</label><textarea value={editDisp.bio} onChange={e => setEditDisp({ ...editDisp, bio: e.target.value })} rows={3} className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-green-500 outline-none resize-none" /></div>
+            <div className="pt-1 border-t">
+              <p className="text-[11px] font-semibold text-gray-600 mt-2 mb-2 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-green-600" />Physical Address</p>
+              <div className="space-y-2">
+                <div><label className="block text-[11px] font-medium text-gray-500 mb-1">Street Address</label><input value={editDisp.address || ""} onChange={e => setEditDisp({ ...editDisp, address: e.target.value })} placeholder="42 Long St" className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-green-500 outline-none" /></div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className="block text-[11px] font-medium text-gray-500 mb-1">City</label><input value={editDisp.city || ""} onChange={e => setEditDisp({ ...editDisp, city: e.target.value })} placeholder="Cape Town" className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-green-500 outline-none" /></div>
+                  <div><label className="block text-[11px] font-medium text-gray-500 mb-1">Province</label><input value={editDisp.province || ""} onChange={e => setEditDisp({ ...editDisp, province: e.target.value })} placeholder="Western Cape" className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-green-500 outline-none" /></div>
+                </div>
+                <p className="text-[10px] text-gray-400">Customers see this as your pickup/collection point.</p>
+              </div>
+            </div>
           </div>
 
           <div className="bg-white rounded-xl p-4 border space-y-3">

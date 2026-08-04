@@ -11,10 +11,13 @@ export function AuthProvider({ children }) {
   const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("wd_token");
-    if (token) {
+    // Restore the session on load. "Keep me signed in" stores a refresh token, so a missing or
+    // expired access token is recoverable — previously we gave up whenever wd_token was absent,
+    // which silently signed people out on refresh (and hid the cart icon mid-checkout).
+    const hasSession = localStorage.getItem("wd_token") || localStorage.getItem("wd_refresh");
+    if (hasSession) {
       api("GET", "/auth/me").then(res => {
-        if (res.ok && res.data?.user) { setCurrentUser(res.data.user); }
+        if (res.ok && res.data?.user) setCurrentUser(res.data.user);
         setAuthLoading(false);
       });
     } else {

@@ -42,15 +42,20 @@ const refreshToken = async () => {
   return false;
 };
 
-export const api = async (method, path, body) => {
+// Endpoints where a 401 is a real answer ("wrong password"), not an expired session.
+// Retrying these after a refresh caused an infinite loop: bad password -> 401 -> refresh
+// succeeds -> retry -> 401 -> ... so sign-in spun forever instead of showing the error.
+const NO_REFRESH_PATHS = ["/auth/login", "/auth/register", "/auth/refresh"];
+
+export const api = async (method, path, body, _retried = false) => {
   try {
     const opts = { method, headers: authHeaders(), credentials: "include" };
     if (body) opts.body = JSON.stringify(body);
     const res = await fetch(`${API}${path}`, opts);
     const data = await res.json().catch(() => null);
-    if (res.status === 401 && path !== "/auth/refresh") {
+    if (res.status === 401 && !_retried && !NO_REFRESH_PATHS.some(p => path.startsWith(p))) {
       const refreshed = await refreshToken();
-      if (refreshed) return api(method, path, body);
+      if (refreshed) return api(method, path, body, true); // retry once, never loop
     }
     return { ok: res.ok, status: res.status, data };
   } catch (err) {
