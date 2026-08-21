@@ -15,6 +15,8 @@ export default function OrderTrackingPage() {
   const { notify, notifications } = useUI();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [rating, setRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
@@ -52,6 +54,31 @@ export default function OrderTrackingPage() {
       <div className="h-28 sm:h-36 rounded-xl sm:rounded-2xl bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center border border-green-200 mb-3 relative">
         {order.status === "IN_TRANSIT" ? <Truck className="w-10 h-10 text-green-600 animate-bounce" /> : order.status === "DELIVERED" ? <CheckCircle className="w-10 h-10 text-green-600" /> : <Navigation className="w-8 h-8 text-green-600" />}
       </div>
+      {/* An order is created before the customer is sent to the payment provider, so a failed or
+          abandoned payment leaves it sitting here PENDING. Without this they had no way to pay. */}
+      {order.status === "PENDING" && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-3">
+          <p className="font-bold text-sm text-amber-900 mb-0.5">Payment outstanding</p>
+          <p className="text-[11px] text-amber-700 mb-3">This order is placed but not paid for yet. The dispensary only starts preparing it once payment goes through.</p>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[11px] text-amber-700">Amount due</span>
+            <span className="font-black text-amber-900">{formatZAR(order.total)}</span>
+          </div>
+          <button
+            onClick={async () => {
+              setPaying(true); setPayError(null);
+              const res = await api("POST", "/payments/initiate", { orderId: order.id, provider: "YOCO" });
+              if (res.ok && res.data?.redirectUrl) { window.location.href = res.data.redirectUrl; return; }
+              setPayError(res.data?.error || "Couldn't start the payment. Please try again in a moment.");
+              setPaying(false);
+            }}
+            disabled={paying}
+            className={`w-full py-3 rounded-xl text-white font-bold text-sm shadow transition ${paying ? "opacity-60 cursor-wait" : "hover:shadow-lg"}`}
+            style={{ background: "linear-gradient(135deg, #1A7A2E, #2d9a4a)" }}
+          >{paying ? "Opening secure checkout…" : "Pay now"}</button>
+          {payError && <p className="text-[11px] text-red-600 mt-2">{payError}</p>}
+        </div>
+      )}
       {notifs.length > 0 && <div className="mb-3 space-y-1">{notifs.slice(0, 3).map(n => <div key={n.id} className="bg-green-50 border border-green-200 rounded-lg px-3 py-1.5 text-[11px] text-green-800 flex items-center gap-2"><Bell className="w-3 h-3 flex-shrink-0" /><span className="flex-1">{n.msg}</span><span className="text-green-500 ml-auto whitespace-nowrap">{timeAgo(n.time)}</span></div>)}</div>}
       <div className="bg-white rounded-xl p-4 border mb-3">
         <h3 className="font-bold text-sm mb-3">Progress</h3>

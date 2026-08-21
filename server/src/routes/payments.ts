@@ -87,12 +87,24 @@ router.post("/initiate", authenticate, async (req: Request, res: Response) => {
       return res.status(400).json({ error: `Order already ${order.status.toLowerCase()}` });
     }
 
-    // Block duplicate PENDING payments
+    // A previous attempt can die at the provider (card declined, window closed) without ever
+    // telling us, leaving a PENDING payment behind. Blocking on that forever made the order
+    // permanently unpayable. Only guard against genuine double-submits (a very recent attempt);
+    // anything older is abandoned, so retire it and let the customer try again.
+    const DOUBLE_SUBMIT_WINDOW_MS = 2 * 60 * 1000;
     const existingPayment = await prisma.payment.findFirst({
       where: { orderId, status: "PENDING" },
+      orderBy: { createdAt: "desc" },
     });
     if (existingPayment) {
-      return res.status(409).json({ error: "Payment already in progress", paymentId: existingPayment.id });
+      const age = Date.now() - new Date(existingPayment.createdAt).getTime();
+      if (age < DOUBLE_SUBMIT_WINDOW_MS) {
+        return res.status(409).json({ error: "Payment already in progress", paymentId: existingPayment.id });
+      }
+      await prisma.payment.updateMany({
+        where: { orderId, status: "PENDING" },
+        data: { status: "FAILED", providerRef: "abandoned - superseded by retry" },
+      });
     }
 
     const amountCents = Math.round(Number(order.total) * 100);
