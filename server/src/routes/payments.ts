@@ -312,20 +312,27 @@ router.post("/verify/ikhokha", authenticate, async (req: Request, res: Response)
 // IKHOKHA CALLBACK (server-to-server) — marks the order paid.
 router.post("/webhook/ikhokha", async (req: Request & { rawBody?: string }, res: Response) => {
   try {
+    // NEVER accept an unverified callback — it can mark an order paid. If the secret is not
+    // configured we cannot verify anything, so refuse rather than trusting the caller.
+    if (!IKHOKHA_APP_SECRET) {
+      console.error("[iKhokha] webhook received but IKHOKHA_APP_SECRET is not configured");
+      return res.status(503).json({ error: "Payment provider not configured" });
+    }
     const signature = req.headers["ik-sign"] as string | undefined;
     const raw = req.rawBody ?? JSON.stringify(req.body);
-    if (IKHOKHA_APP_SECRET) {
-      const expected = crypto.createHmac("sha256", IKHOKHA_APP_SECRET.trim()).update(raw).digest("hex");
-      const sigBuf = Buffer.from(signature || "", "utf8");
-      const expBuf = Buffer.from(expected, "utf8");
-      if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
-        console.error("[iKhokha] webhook signature mismatch");
-        return res.status(401).json({ error: "Invalid signature" });
-      }
+    const expected = crypto.createHmac("sha256", IKHOKHA_APP_SECRET.trim()).update(raw).digest("hex");
+    const sigBuf = Buffer.from(signature || "", "utf8");
+    const expBuf = Buffer.from(expected, "utf8");
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+      console.error("[iKhokha] webhook signature mismatch");
+      return res.status(401).json({ error: "Invalid signature" });
     }
 
     const { externalTransactionID, status, paylinkID } = req.body || {};
     if (!externalTransactionID) return res.status(400).json({ error: "Missing externalTransactionID" });
+
+    const known = await prisma.payment.findUnique({ where: { id: externalTransactionID } });
+    if (!known) return res.status(404).json({ error: "Unknown payment" });
 
     const normalized = String(status || "").toUpperCase();
     const io = req.app.get("io");
