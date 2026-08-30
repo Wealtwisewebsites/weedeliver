@@ -67,7 +67,7 @@ export default function OrderTrackingPage() {
           <button
             onClick={async () => {
               setPaying(true); setPayError(null);
-              const res = await api("POST", "/payments/initiate", { orderId: order.id, provider: "YOCO" });
+              const res = await api("POST", "/payments/initiate", { orderId: order.id, provider: "IKHOKHA" });
               if (res.ok && res.data?.redirectUrl) { window.location.href = res.data.redirectUrl; return; }
               setPayError(res.data?.error || "Couldn't start the payment. Please try again in a moment.");
               setPaying(false);

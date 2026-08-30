@@ -12,7 +12,8 @@ export default function CheckoutPage() {
   const { currentUser, setCurrentUser } = useAuth();
   const { cart, cartTotal, clearCart } = useCart();
   const { notify } = useUI();
-  const [pay, setPay] = useState("yoco");
+  const [pay, setPay] = useState("ikhokha");
+  const PROVIDER_LABEL = { ikhokha: "iKhokha", yoco: "Yoco", paystack: "Paystack" };
   const [fulfillment, setFulfillment] = useState("DELIVERY");
   const [addr, setAddr] = useState("");
   const [dob, setDob] = useState("");
@@ -74,10 +75,10 @@ export default function CheckoutPage() {
     const orderId = orderRes.data.id;
 
     // 4. Card / EFT — start the payment and redirect to the provider's checkout.
-    if (pay === "yoco" || pay === "paystack") {
+    if (pay === "yoco" || pay === "paystack" || pay === "ikhokha") {
       const res = await api("POST", "/payments/initiate", { orderId, provider: pay.toUpperCase() });
       if (res.ok && res.data?.redirectUrl) {
-        notify(`Redirecting to ${pay === "yoco" ? "Yoco" : "Paystack"} checkout…`);
+        notify(`Redirecting to ${PROVIDER_LABEL[pay]} checkout…`);
         clearCart();
         window.location.href = res.data.redirectUrl;
         return;
@@ -129,7 +130,7 @@ export default function CheckoutPage() {
           </div>
         )}
         <div className="bg-white rounded-xl p-4 border"><h3 className="font-bold text-sm mb-2"><CreditCard className="w-4 h-4 inline text-green-600 mr-1" />Payment Method</h3>
-          {[{ id: "yoco", l: "Pay by Card", sub: "Yoco - Visa, Mastercard, Amex", ic: "\u{1F4B3}" }, { id: "paystack", l: "EFT / Card", sub: "Paystack - Instant EFT or card", ic: "\u{1F3E6}" }].map(m => (
+          {[{ id: "ikhokha", l: "Pay by Card / EFT", sub: "iKhokha - card or instant EFT", ic: "\u{1F4B3}" }, { id: "yoco", l: "Pay by Card", sub: "Yoco - Visa, Mastercard, Amex", ic: "\u{1F4B3}" }, { id: "paystack", l: "EFT / Card", sub: "Paystack - Instant EFT or card", ic: "\u{1F3E6}" }].map(m => (
             <button key={m.id} onClick={() => setPay(m.id)} className={`w-full p-3 rounded-xl border text-left flex items-center gap-3 mb-2 transition-all ${pay === m.id ? "border-green-500 bg-green-50 ring-1 ring-green-500 shadow-sm" : "border-gray-200 hover:border-gray-300"}`}>
               <span className="text-lg">{m.ic}</span>
               <div className="flex-1"><div className="text-sm font-semibold">{m.l}</div><div className="text-[10px] text-gray-400">{m.sub}</div></div>
@@ -146,7 +147,7 @@ export default function CheckoutPage() {
         <button onClick={handlePlaceOrder} disabled={processing} className={`w-full py-3.5 rounded-full text-white font-bold text-base shadow-lg transition-all ${processing ? "opacity-60 cursor-wait" : "hover:shadow-xl active:scale-[0.98]"}`} style={{ background: "linear-gradient(135deg, #1A7A2E, #2d9a4a)" }}>
           {processing ? <span className="flex items-center justify-center gap-2"><RefreshCw className="w-4 h-4 animate-spin" />Processing...</span> : `Pay ${formatZAR(totalAmount)}`}
         </button>
-        <p className="text-center text-[10px] text-gray-400">Secure payment powered by {pay === "yoco" ? "Yoco" : "Paystack"}</p>
+        <p className="text-center text-[10px] text-gray-400">Secure payment powered by {PROVIDER_LABEL[pay] || "our payment partner"}</p>
       </div>
     </div>
   );

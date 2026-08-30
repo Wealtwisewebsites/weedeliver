@@ -3,12 +3,13 @@ import prisma from "../prisma.js";
 import { authenticate } from "../middleware/auth.js";
 import { z } from "zod";
 import { verifyYocoSignature, verifyPaystackSignature } from "../utils.js";
+import crypto from "crypto";
 
 const router = Router();
 
 const initiateSchema = z.object({
   orderId: z.string().uuid(),
-  provider: z.enum(["YOCO", "PAYSTACK", "SNAPSCAN", "EFT"]),
+  provider: z.enum(["YOCO", "PAYSTACK", "SNAPSCAN", "EFT", "IKHOKHA"]),
 });
 
 const YOCO_SECRET = process.env.YOCO_SECRET_KEY || "";
@@ -16,6 +17,27 @@ const YOCO_WEBHOOK_SECRET = process.env.YOCO_WEBHOOK_SECRET || "";
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || "";
 const SNAPSCAN_KEY = process.env.SNAPSCAN_API_KEY || "";
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
+
+// ─── iKhokha (iK Pay API) ───
+// Docs: https://dev.ikhokha.com — auth is an IK-APPID header plus an IK-SIGN HMAC-SHA256
+// signature over (url path + JSON body), hex encoded, keyed with the app secret.
+const IKHOKHA_APP_ID = process.env.IKHOKHA_APP_ID || "";
+const IKHOKHA_APP_SECRET = process.env.IKHOKHA_APP_SECRET || "";
+const IKHOKHA_ENTITY_ID = process.env.IKHOKHA_ENTITY_ID || "";
+const IKHOKHA_PAYMENT_URL = "https://api.ikhokha.com/public-api/v1/api/payment";
+
+/** iKhokha escapes backslashes/quotes and null bytes before signing. */
+function ikEscape(payload: string): string {
+  return payload.replace(/[\\"']/g, "\\$&").replace(new RegExp("\u0000", "g"), "\\0");
+}
+
+/** HMAC-SHA256(hex) of the escaped (path + body), keyed with the app secret. */
+function ikSign(urlPath: string, bodyJson: string): string {
+  return crypto
+    .createHmac("sha256", IKHOKHA_APP_SECRET.trim())
+    .update(ikEscape(urlPath + bodyJson))
+    .digest("hex");
+}
 
 // EFT bank details from env (SECURITY: never hardcode account numbers)
 const EFT_BANK = process.env.EFT_BANK_NAME || "FNB";
@@ -121,7 +143,57 @@ router.post("/initiate", authenticate, async (req: Request, res: Response) => {
     const fallbackUrl = process.env.NODE_ENV === "production" ? "https://weedeliver-full.vercel.app" : "http://localhost:5173";
     const clientUrl = (isValidUrl ? rawClientUrl : fallbackUrl).replace(/\/+$/, "");
 
-    if (provider === "YOCO") {
+    if (provider === "IKHOKHA") {
+      if (!IKHOKHA_APP_ID || !IKHOKHA_APP_SECRET) {
+        return res.status(500).json({ error: "Payment provider not configured" });
+      }
+      try {
+        // iKhokha needs an absolute, publicly reachable callback URL.
+        const rawServerUrl = (process.env.SERVER_URL || "").trim().replace(/\/+$/, "");
+        const serverUrl = /^https?:\/\/[^\s/]+/.test(rawServerUrl)
+          ? rawServerUrl
+          : (IS_PRODUCTION ? "https://weedeliver.onrender.com" : "http://localhost:3000");
+        const apiUrl = new URL(IKHOKHA_PAYMENT_URL);
+        const ikBody = {
+          entityID: IKHOKHA_ENTITY_ID || payment.id,
+          externalEntityID: orderId,
+          amount: amountCents, // iKhokha expects cents
+          currency: "ZAR",
+          requesterUrl: `${clientUrl}/order/${orderId}`,
+          description: `WeeDeliver order ${orderId.slice(0, 8).toUpperCase()}`,
+          paymentReference: orderId.slice(0, 8).toUpperCase(),
+          mode: IS_PRODUCTION ? "live" : "sandbox",
+          externalTransactionID: payment.id,
+          urls: {
+            // Server-to-server confirmation — this is what actually marks the order paid.
+            callbackUrl: `${serverUrl}/api/v1/payments/webhook/ikhokha`,
+            successPageUrl: `${clientUrl}/payment/callback?provider=ikhokha&paymentId=${payment.id}&status=success`,
+            failurePageUrl: `${clientUrl}/payment/callback?provider=ikhokha&paymentId=${payment.id}&status=failed`,
+            cancelUrl: `${clientUrl}/payment/callback?provider=ikhokha&paymentId=${payment.id}&status=cancelled`,
+          },
+        };
+        const bodyJson = JSON.stringify(ikBody);
+        const ikRes = await fetch(IKHOKHA_PAYMENT_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "IK-APPID": IKHOKHA_APP_ID.trim(),
+            "IK-SIGN": ikSign(apiUrl.pathname, bodyJson),
+          },
+          body: bodyJson,
+        });
+        const ikData: any = await ikRes.json().catch(() => ({}));
+        if (ikData.paylinkUrl) {
+          await prisma.payment.update({ where: { id: payment.id }, data: { providerRef: ikData.paylinkID } });
+          checkoutData.redirectUrl = ikData.paylinkUrl;
+          checkoutData.checkoutId = ikData.paylinkID;
+        } else {
+          console.error("[iKhokha] paylink creation failed", ikRes.status, JSON.stringify(ikData).slice(0, 300));
+          checkoutData.error = ikData.message || `iKhokha error (HTTP ${ikRes.status})`;
+        }
+      } catch { checkoutData.error = "Payment provider temporarily unavailable"; }
+    } else if (provider === "YOCO") {
       if (!YOCO_SECRET) return res.status(500).json({ error: "Payment provider not configured" });
       try {
         const yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
@@ -215,6 +287,58 @@ router.post("/verify/yoco", authenticate, async (req: Request, res: Response) =>
   } catch (err: unknown) {
     console.error("Yoco verify error:", err);
     res.status(500).json({ error: "Payment verification failed. Please try again." });
+  }
+});
+
+// VERIFY IKHOKHA
+// iKhokha has no public status-lookup endpoint, so the server-to-server callback is the source
+// of truth. This just reports what the callback has recorded for the customer's own payment.
+router.post("/verify/ikhokha", authenticate, async (req: Request, res: Response) => {
+  try {
+    const { paymentId } = req.body;
+    if (!paymentId) return res.status(400).json({ error: "paymentId required" });
+    const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
+    if (!payment) return res.status(404).json({ error: "Payment not found" });
+    if (payment.userId !== req.user!.id) return res.status(403).json({ error: "Not your payment" });
+
+    if (payment.status === "SUCCESSFUL") return res.json({ success: true, payment });
+    if (payment.status === "FAILED") return res.status(400).json({ error: "Payment failed" });
+    return res.json({ success: false, status: payment.status, message: "Payment still processing" });
+  } catch (err: unknown) {
+    res.status(500).json({ error: safeError(err) });
+  }
+});
+
+// IKHOKHA CALLBACK (server-to-server) — marks the order paid.
+router.post("/webhook/ikhokha", async (req: Request & { rawBody?: string }, res: Response) => {
+  try {
+    const signature = req.headers["ik-sign"] as string | undefined;
+    const raw = req.rawBody ?? JSON.stringify(req.body);
+    if (IKHOKHA_APP_SECRET) {
+      const expected = crypto.createHmac("sha256", IKHOKHA_APP_SECRET.trim()).update(raw).digest("hex");
+      const sigBuf = Buffer.from(signature || "", "utf8");
+      const expBuf = Buffer.from(expected, "utf8");
+      if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+        console.error("[iKhokha] webhook signature mismatch");
+        return res.status(401).json({ error: "Invalid signature" });
+      }
+    }
+
+    const { externalTransactionID, status, paylinkID } = req.body || {};
+    if (!externalTransactionID) return res.status(400).json({ error: "Missing externalTransactionID" });
+
+    const normalized = String(status || "").toUpperCase();
+    const io = req.app.get("io");
+    if (["SUCCESS", "SUCCESSFUL", "COMPLETE", "COMPLETED", "PAID"].includes(normalized)) {
+      await confirmPayment(externalTransactionID, paylinkID || "ikhokha", io);
+    } else if (["FAILED", "CANCELLED", "EXPIRED", "DECLINED"].includes(normalized)) {
+      await failPayment(externalTransactionID, `iKhokha ${normalized.toLowerCase()}`);
+    }
+    // Always 200 so iKhokha does not retry a message we understood.
+    res.json({ received: true });
+  } catch (err) {
+    console.error("[iKhokha] webhook error", err);
+    res.status(500).json({ error: "Webhook processing failed" });
   }
 });
 

@@ -21,7 +21,7 @@ export default function PaymentCallbackPage() {
 
     const verify = async () => {
       try {
-        const endpoint = provider === "paystack" ? "verify/paystack" : "verify/yoco";
+        const endpoint = provider === "paystack" ? "verify/paystack" : provider === "ikhokha" ? "verify/ikhokha" : "verify/yoco";
         const body = provider === "paystack" ? { reference: paymentId } : { paymentId };
         const res = await api("POST", `/payments/${endpoint}`, body);
         if (res.data?.success) {
