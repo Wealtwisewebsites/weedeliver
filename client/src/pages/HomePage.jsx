@@ -90,7 +90,7 @@ const STEPS = [
 const FEATURES = [
   { icon: ShieldCheck, title: "Verified dispensaries", body: "Every dispensary is vetted and approved before going live. You only ever shop from legitimate, licensed sources." },
   { icon: Clock, title: "Real-time delivery", body: "Watch your order move through every stage — confirmed, prepared, picked up, and on its way — with live driver tracking." },
-  { icon: Lock, title: "Secure payments", body: "Pay safely with Yoco card, EFT, or QR. Every transaction is encrypted and signature-verified end to end." },
+  { icon: Lock, title: "Secure payments", body: "Pay safely by card or instant EFT through Stitch. Every transaction is encrypted and signature-verified end to end." },
   { icon: Sparkles, title: "Discreet & compliant", body: "Built around South Africa's membership model, with private, unmarked delivery and strict 18+ age verification." },
 ];
 
@@ -344,7 +344,7 @@ export default function HomePage() {
                   <span className="relative inline-flex items-center"><span className="w-4 h-4 rounded-full" style={{ background: "#EB001B" }} /><span className="w-4 h-4 rounded-full -ml-1.5" style={{ background: "#F79E1B", opacity: 0.9 }} /></span>
                   <span className="ml-1.5 text-gray-700">Mastercard</span>
                 </PayBadge>
-                <PayBadge style={{ background: "#0f1b2d", color: "#fff" }}>Yoco</PayBadge>
+                <PayBadge style={{ background: "#0f1b2d", color: "#fff" }}>Stitch</PayBadge>
                 <PayBadge style={{ background: "#00A651", color: "#fff" }}>Instant EFT</PayBadge>
                 <PayBadge style={{ background: "#E4002B", color: "#fff" }}>SnapScan</PayBadge>
               </div>

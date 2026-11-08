@@ -117,27 +117,3 @@ export function maskAccountNumber(encrypted: string): string {
     return "****";
   }
 }
-
-// ─── YOCO SIGNATURE VERIFICATION ───
-export function verifyYocoSignature(payload: string, signature: string, secret: string): boolean {
-  const hmac = crypto.createHmac("sha256", secret);
-  hmac.update(payload);
-  const expected = hmac.digest("hex");
-  // timingSafeEqual requires equal-length buffers — return false if lengths differ
-  const sigBuf = Buffer.from(signature);
-  const expBuf = Buffer.from(expected);
-  if (sigBuf.length !== expBuf.length) return false;
-  return crypto.timingSafeEqual(sigBuf, expBuf);
-}
-
-// ─── PAYSTACK SIGNATURE VERIFICATION ───
-export function verifyPaystackSignature(payload: string, signature: string, secret: string): boolean {
-  const hmac = crypto.createHmac("sha512", secret);
-  hmac.update(payload);
-  const expected = hmac.digest("hex");
-  try {
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-  } catch {
-    return false;
-  }
-}

@@ -24,11 +24,15 @@ services:
         sync: false
       - key: CLIENT_URL
         sync: false
-      - key: YOCO_SECRET_KEY
+      - key: STITCH_CLIENT_ID
         sync: false
-      - key: YOCO_PUBLIC_KEY
+      - key: STITCH_CLIENT_SECRET
         sync: false
-      - key: YOCO_WEBHOOK_SECRET
+      - key: STITCH_WEBHOOK_SECRET
         sync: false
-      - key: PAYSTACK_SECRET_KEY
+      - key: STITCH_BENEFICIARY_NAME
+        sync: false
+      - key: STITCH_BENEFICIARY_BANK_ID
+        sync: false
+      - key: STITCH_BENEFICIARY_ACCOUNT_NUMBER
         sync: false

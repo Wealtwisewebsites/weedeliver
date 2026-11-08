@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, MapPin, CreditCard, AlertCircle, RefreshCw, Truck, Store } from "lucide-react";
 import { formatZAR } from "../lib/formatters";
 import { api } from "../lib/api";
+import { PAYMENT_OPTIONS, fetchPaymentProviders } from "../lib/payments";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { useUI } from "../context/UIContext";
@@ -12,8 +13,9 @@ export default function CheckoutPage() {
   const { currentUser, setCurrentUser } = useAuth();
   const { cart, cartTotal, clearCart } = useCart();
   const { notify } = useUI();
-  const [pay, setPay] = useState("ikhokha");
-  const PROVIDER_LABEL = { ikhokha: "iKhokha", yoco: "Yoco", paystack: "Paystack" };
+  // null while loading; then only the providers the server can actually process (Stitch first).
+  const [providers, setProviders] = useState(null);
+  const [pay, setPay] = useState(null);
   const [fulfillment, setFulfillment] = useState("DELIVERY");
   const [addr, setAddr] = useState("");
   const [dob, setDob] = useState("");
@@ -22,6 +24,13 @@ export default function CheckoutPage() {
   const [cartDispensary, setCartDispensary] = useState(null);
 
   const needsAge = currentUser && !currentUser.isAgeVerified;
+
+  useEffect(() => {
+    fetchPaymentProviders().then(list => {
+      setProviders(list);
+      setPay(current => current ?? list[0] ?? null);
+    });
+  }, []);
 
   useEffect(() => {
     if (cart.length === 0) return;
@@ -39,6 +48,8 @@ export default function CheckoutPage() {
 
   const handlePlaceOrder = async () => {
     setPaymentError(null);
+    // Never create an order the customer has no way to pay for.
+    if (!pay) { setPaymentError("Online payment is unavailable right now. Please try again shortly."); return; }
     if (!isPickup && !addr.trim()) { setPaymentError("Please enter a delivery address."); return; }
     setProcessing(true);
 
@@ -74,23 +85,15 @@ export default function CheckoutPage() {
     }
     const orderId = orderRes.data.id;
 
-    // 4. Card / EFT — start the payment and redirect to the provider's checkout.
-    if (pay === "yoco" || pay === "paystack" || pay === "ikhokha") {
-      const res = await api("POST", "/payments/initiate", { orderId, provider: pay.toUpperCase() });
-      if (res.ok && res.data?.redirectUrl) {
-        notify(`Redirecting to ${PROVIDER_LABEL[pay]} checkout…`);
-        clearCart();
-        window.location.href = res.data.redirectUrl;
-        return;
-      }
-      setPaymentError(res.data?.error || "Couldn't start the payment. Your order is saved — please try paying again.");
-      setProcessing(false);
+    // 4. Card / EFT — start the payment and redirect to the provider's hosted checkout.
+    const res = await api("POST", "/payments/initiate", { orderId, provider: pay });
+    if (res.ok && res.data?.redirectUrl) {
+      notify(`Redirecting to ${PAYMENT_OPTIONS[pay].label} checkout…`);
+      clearCart();
+      window.location.href = res.data.redirectUrl;
       return;
     }
-
-    // Other methods (SnapScan / EFT) — go to the order page for instructions.
-    clearCart();
-    nav(`/order/${orderId}`);
+    setPaymentError(res.data?.error || "Couldn't start the payment. Your order is saved — please try paying again.");
     setProcessing(false);
   };
 
@@ -130,13 +133,20 @@ export default function CheckoutPage() {
           </div>
         )}
         <div className="bg-white rounded-xl p-4 border"><h3 className="font-bold text-sm mb-2"><CreditCard className="w-4 h-4 inline text-green-600 mr-1" />Payment Method</h3>
-          {[{ id: "ikhokha", l: "Pay by Card / EFT", sub: "iKhokha - card or instant EFT", ic: "\u{1F4B3}" }, { id: "yoco", l: "Pay by Card", sub: "Yoco - Visa, Mastercard, Amex", ic: "\u{1F4B3}" }, { id: "paystack", l: "EFT / Card", sub: "Paystack - Instant EFT or card", ic: "\u{1F3E6}" }].map(m => (
-            <button key={m.id} onClick={() => setPay(m.id)} className={`w-full p-3 rounded-xl border text-left flex items-center gap-3 mb-2 transition-all ${pay === m.id ? "border-green-500 bg-green-50 ring-1 ring-green-500 shadow-sm" : "border-gray-200 hover:border-gray-300"}`}>
-              <span className="text-lg">{m.ic}</span>
-              <div className="flex-1"><div className="text-sm font-semibold">{m.l}</div><div className="text-[10px] text-gray-400">{m.sub}</div></div>
-              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${pay === m.id ? "border-green-600" : "border-gray-300"}`}>{pay === m.id && <div className="w-2.5 h-2.5 rounded-full bg-green-600" />}</div>
-            </button>
-          ))}
+          {providers === null && <p className="text-xs text-gray-400 py-2">Loading payment options…</p>}
+          {providers?.length === 0 && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">Online payment is unavailable right now. Please try again shortly.</p>
+          )}
+          {providers?.map(code => {
+            const m = PAYMENT_OPTIONS[code];
+            return (
+              <button key={code} onClick={() => setPay(code)} className={`w-full p-3 rounded-xl border text-left flex items-center gap-3 mb-2 transition-all ${pay === code ? "border-green-500 bg-green-50 ring-1 ring-green-500 shadow-sm" : "border-gray-200 hover:border-gray-300"}`}>
+                <span className="text-lg">{m.icon}</span>
+                <div className="flex-1"><div className="text-sm font-semibold">{m.title}</div><div className="text-[10px] text-gray-400">{m.sub}</div></div>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${pay === code ? "border-green-600" : "border-gray-300"}`}>{pay === code && <div className="w-2.5 h-2.5 rounded-full bg-green-600" />}</div>
+              </button>
+            );
+          })}
         </div>
         <div className="bg-white rounded-xl p-4 border"><h3 className="font-bold text-sm mb-2">Order Summary</h3>
           {cart.map(i => <div key={i.id} className="flex justify-between text-sm py-0.5"><span className="text-gray-600">{i.quantity}x {i.name}</span><span>{formatZAR(i.price * i.quantity)}</span></div>)}
@@ -144,10 +154,10 @@ export default function CheckoutPage() {
           <div className="flex justify-between mt-1"><span className="font-bold">Total</span><span className="font-black text-green-700 text-lg">{formatZAR(totalAmount)}</span></div>
         </div>
         {paymentError && <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2"><AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" /><span className="text-xs text-red-700">{paymentError}</span></div>}
-        <button onClick={handlePlaceOrder} disabled={processing} className={`w-full py-3.5 rounded-full text-white font-bold text-base shadow-lg transition-all ${processing ? "opacity-60 cursor-wait" : "hover:shadow-xl active:scale-[0.98]"}`} style={{ background: "linear-gradient(135deg, #1A7A2E, #2d9a4a)" }}>
+        <button onClick={handlePlaceOrder} disabled={processing || !pay} className={`w-full py-3.5 rounded-full text-white font-bold text-base shadow-lg transition-all ${processing ? "opacity-60 cursor-wait" : !pay ? "opacity-50 cursor-not-allowed" : "hover:shadow-xl active:scale-[0.98]"}`} style={{ background: "linear-gradient(135deg, #1A7A2E, #2d9a4a)" }}>
           {processing ? <span className="flex items-center justify-center gap-2"><RefreshCw className="w-4 h-4 animate-spin" />Processing...</span> : `Pay ${formatZAR(totalAmount)}`}
         </button>
-        <p className="text-center text-[10px] text-gray-400">Secure payment powered by {PROVIDER_LABEL[pay] || "our payment partner"}</p>
+        <p className="text-center text-[10px] text-gray-400">Secure payment powered by {PAYMENT_OPTIONS[pay]?.label || "our payment partner"}</p>
       </div>
     </div>
   );

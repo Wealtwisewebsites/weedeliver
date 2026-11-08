@@ -4,6 +4,7 @@ import { ArrowLeft, Check, Truck, CheckCircle, Navigation, Bell, Star } from "lu
 import { ORDER_FLOW, ORDER_FLOW_LABELS } from "../lib/constants";
 import { formatZAR, fmtDateTime, timeAgo } from "../lib/formatters";
 import { api } from "../lib/api";
+import { fetchPaymentProviders } from "../lib/payments";
 import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../context/AuthContext";
 import { useUI } from "../context/UIContext";
@@ -67,7 +68,9 @@ export default function OrderTrackingPage() {
           <button
             onClick={async () => {
               setPaying(true); setPayError(null);
-              const res = await api("POST", "/payments/initiate", { orderId: order.id, provider: "IKHOKHA" });
+              const [provider] = await fetchPaymentProviders();
+              if (!provider) { setPayError("Online payment is unavailable right now. Please try again shortly."); setPaying(false); return; }
+              const res = await api("POST", "/payments/initiate", { orderId: order.id, provider });
               if (res.ok && res.data?.redirectUrl) { window.location.href = res.data.redirectUrl; return; }
               setPayError(res.data?.error || "Couldn't start the payment. Please try again in a moment.");
               setPaying(false);

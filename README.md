@@ -100,15 +100,16 @@ npm run dev
 
 ### Feature 3: South African Payment Integration
 
-#### 3A — Yoco (Card)
-- `POST /api/v1/payments/initiate` with `{ orderId, provider: "YOCO" }` → returns popup config
-- Frontend loads Yoco SDK popup → collects card → calls `/verify/yoco`
-- Webhook: `POST /api/v1/payments/webhook/yoco` (SHA-256 signature verification)
+#### 3A — Stitch (Card + Pay by Bank)
+- `GET /api/v1/payments/providers` → the online providers the server has credentials for; checkout only offers these
+- `POST /api/v1/payments/initiate` with `{ orderId, provider: "STITCH" }` → creates a Stitch payment request and returns its hosted `redirectUrl`
+- Stitch sends the payer back to `/payment/callback?provider=stitch&paymentId=…` → frontend calls `/verify/stitch`
+- Webhook: `POST /api/v1/payments/webhook/stitch` (Svix HMAC-SHA256, 5-minute replay window) — the source of truth; a completed payment is only accepted if the paid amount matches the order
+- Client code lives in `server/src/services/stitch.ts` (unit tests: `npm test` in `server/`)
 
-#### 3B — Paystack (EFT + Card)
-- `POST /api/v1/payments/initiate` with `{ orderId, provider: "PAYSTACK" }` → returns `authorization_url`
-- Frontend redirects to Paystack → callback → `/verify/paystack`
-- Webhook: `POST /api/v1/payments/webhook/paystack` (HMAC-SHA512 verification)
+#### 3B — iKhokha (Card + EFT)
+- `POST /api/v1/payments/initiate` with `{ orderId, provider: "IKHOKHA" }` → returns a paylink `redirectUrl`
+- Server-to-server callback: `POST /api/v1/payments/webhook/ikhokha` (HMAC-SHA256)
 
 #### 3C — SnapScan (QR Code)
 - `POST /api/v1/payments/initiate` with `{ orderId, provider: "SNAPSCAN" }` → returns QR URL
@@ -132,7 +133,7 @@ npm run dev
 | Product | Menu items with THC/CBD/strain info |
 | Order | Full state machine with timestamps |
 | OrderItem | Line items per order |
-| Payment | Yoco/Paystack/SnapScan/EFT transaction log |
+| Payment | Stitch/iKhokha/SnapScan/EFT transaction log |
 | Membership | FREE/PAID/UPLOAD_PROOF per dispensary |
 | DeliveryTracking | Real-time driver GPS |
 | Driver | Driver profile + stats |
@@ -156,12 +157,13 @@ npm run dev
 | GET | /dispensaries/:id/banking | Owner | Get masked banking |
 | POST | /products | DISPENSARY | Create product |
 | POST | /orders | CUSTOMER | Place order (enforces trading hours) |
-| POST | /payments/initiate | Auth | Start Yoco/Paystack/SnapScan |
-| POST | /payments/verify/yoco | Auth | Verify Yoco charge |
-| POST | /payments/verify/paystack | Auth | Verify Paystack payment |
+| GET | /payments/providers | — | Online providers that are configured |
+| POST | /payments/initiate | Auth | Start Stitch/iKhokha/SnapScan |
+| POST | /payments/verify/stitch | Auth | Check a Stitch payment request |
+| POST | /payments/verify/ikhokha | Auth | Report a recorded iKhokha result |
 | GET | /payments/status/:orderId | Auth | Poll SnapScan status |
-| POST | /payments/webhook/yoco | — | Yoco webhook |
-| POST | /payments/webhook/paystack | — | Paystack webhook |
+| POST | /payments/webhook/stitch | — | Stitch webhook (Svix-signed) |
+| POST | /payments/webhook/ikhokha | — | iKhokha callback (HMAC-signed) |
 | GET | /admin/payouts | ADMIN | List dispensary payouts |
 | POST | /admin/payouts | ADMIN | Create payout |
 
@@ -190,9 +192,10 @@ All routes prefixed with `/api/v1/`.
 | DATABASE_URL | PostgreSQL connection string |
 | JWT_SECRET | JWT signing secret |
 | JWT_REFRESH_SECRET | Refresh token secret |
-| YOCO_SECRET_KEY | Yoco API secret (yoco.com) |
-| YOCO_PUBLIC_KEY | Yoco public key (for frontend popup) |
-| PAYSTACK_SECRET_KEY | Paystack API key (paystack.com) |
+| STITCH_CLIENT_ID / STITCH_CLIENT_SECRET | Stitch API client credentials (stitch.money) |
+| STITCH_WEBHOOK_SECRET | `whsec_…` signing secret for `/payments/webhook/stitch` |
+| STITCH_BENEFICIARY_NAME / _BANK_ID / _ACCOUNT_NUMBER | Bank account Stitch pays into |
+| STITCH_PAYMENT_METHODS | Optional, default `card,eft` |
 | SNAPSCAN_API_KEY | SnapScan merchant key |
 | ENCRYPTION_KEY | 32-char AES-256 key for banking encryption |
 | SENDGRID_API_KEY | For payout email notifications |
@@ -201,5 +204,5 @@ All routes prefixed with `/api/v1/`.
 ## Tech Stack
 - **Frontend**: React 18, Vite, Tailwind CSS, Lucide Icons, Recharts
 - **Backend**: Express, Prisma ORM, PostgreSQL, Socket.io, JWT, Zod
-- **Payments**: Yoco (card), Paystack (EFT), SnapScan (QR), manual EFT payouts
+- **Payments**: Stitch (card + Pay by Bank), iKhokha (card + EFT), SnapScan (QR), manual EFT payouts
 - **Security**: AES-256 banking encryption, HMAC webhook verification, JWT refresh tokens
